@@ -1,0 +1,6 @@
+{
+  "name": "SaaS Multi-tenant ERP cho SMEs",
+  "description": "Hệ thống Quản lý Doanh nghiệp SaaS Multi-tenant tích hợp phân hệ HRM, HĐLD, Bán hàng, Công nợ, Định mức sản xuất BOM và Cổng di động Công nhân.",
+  "requestFramePermissions": ["camera"],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
