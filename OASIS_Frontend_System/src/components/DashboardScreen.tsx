@@ -1,5 +1,5 @@
 import { useState, useTransition } from "react";
-import { SalesOrder, Contract, LeaveRequest } from "../types";
+import { SalesOrder, Contract, LeaveRequest, MaterialImport, SupplierPayable } from "../types";
 import { TrendingUp, AlertCircle, Check, X, FileText, CalendarRange, UserPlus, FileCheck2, ArrowRight } from "lucide-react";
 
 interface DashboardScreenProps {
@@ -12,6 +12,9 @@ interface DashboardScreenProps {
   onRejectContract: (id: string, reason: string) => void;
   onApproveLeave: (id: string) => void;
   onRejectLeave: (id: string, reason: string) => void;
+  materialImports?: MaterialImport[];
+  supplierPayables?: SupplierPayable[];
+  corporateTaxRate?: number;
 }
 
 export default function DashboardScreen({
@@ -23,7 +26,10 @@ export default function DashboardScreen({
   onApproveContract,
   onRejectContract,
   onApproveLeave,
-  onRejectLeave
+  onRejectLeave,
+  materialImports = [],
+  supplierPayables = [],
+  corporateTaxRate = 20
 }: DashboardScreenProps) {
   const [, startTransition] = useTransition();
   const [selectedInboxItem, setSelectedInboxItem] = useState<{
@@ -53,6 +59,16 @@ export default function DashboardScreen({
 
   const totalRevenue = approvedOrders.reduce((sum, o) => sum + o.totalAmount, 0);
   const totalPendingCount = pendingOrders.length + pendingContracts.length + pendingLeaves.length;
+
+  // Real-time tax-aware corporate finance calculations
+  const netSalesRevenue = totalRevenue - Math.round(totalRevenue * 0.1); // 10% Output VAT deduction
+  const materialCostSum = materialImports.reduce((sum, imp) => sum + imp.totalAmount, 0);
+  const totalEmployeeSalariesSum = contracts.filter(c => c.status === "APPROVED").reduce((sum, c) => sum + c.basicSalary, 0) + 7700000;
+  const otherOverheadCosts = 15000000;
+  const totalCorporateExpenses = materialCostSum + totalEmployeeSalariesSum + otherOverheadCosts;
+  const profitBeforeTax = netSalesRevenue - totalCorporateExpenses;
+  const taxCITAmount = profitBeforeTax > 0 ? Math.round(profitBeforeTax * (corporateTaxRate / 100)) : 0;
+  const netProfitAfterTax = profitBeforeTax - taxCITAmount;
 
   const liveRevenueM = Math.round(totalRevenue / 1000000) || 115;
   const liveDSHeight = Math.min(160, liveRevenueM * 0.85);
@@ -230,20 +246,20 @@ export default function DashboardScreen({
           </div>
         </div>
 
-        {/* Card 3: Production Yield */}
+        {/* Card 3: Net Profit After Tax */}
         <div className="bg-white border border-slate-100 p-5 rounded-2xl shadow-sm hover:shadow-md transition-all duration-200">
           <div className="flex justify-between items-start">
-            <span className="text-xs font-semibold text-slate-400">Sản lượng Thành phẩm</span>
-            <span className="px-2 py-0.5 rounded-full bg-slate-teal-light text-slate-teal text-[10px] font-bold">
-              Đạt QA: 98.5%
+            <span className="text-xs font-semibold text-slate-400 font-sans">Lợi Nhuận Ròng (Sau Thuế CIT)</span>
+            <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold ${netProfitAfterTax > 0 ? "bg-emerald-50 text-emerald-600" : "bg-rose-50 text-rose-600"}`}>
+              CIT: {corporateTaxRate}%
             </span>
           </div>
           <div className="mt-3">
-            <span className="text-xl font-bold text-slate-800 tracking-tight block">
-              14,200 sản phẩm
+            <span className={`text-xl font-bold tracking-tight block ${netProfitAfterTax > 0 ? "text-emerald-600" : "text-rose-600"}`}>
+              {formatMoney(netProfitAfterTax)}
             </span>
-            <span className="text-[10px] text-slate-500 mt-1.5 block font-sans">
-              Kế hoạch hoàn thành kỳ 1 đạt tiến độ
+            <span className="text-[10px] text-slate-400 mt-1.5 block font-sans">
+              Đã trừ Thuế TNDN và chi phí vận hành
             </span>
           </div>
         </div>

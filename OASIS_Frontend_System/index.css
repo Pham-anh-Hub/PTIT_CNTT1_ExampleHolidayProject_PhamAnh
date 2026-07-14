@@ -3,7 +3,7 @@
 
 @theme {
   --font-sans: "Poppins", ui-sans-serif, system-ui, sans-serif;
-  --font-mono: "JetBrains Mono", ui-monospace, SFMono-Regular, monospace;
+  --font-mono: "Poppins", ui-sans-serif, system-ui, sans-serif;
   --font-display: "Poppins", ui-sans-serif, system-ui, sans-serif;
   --font-roboto: "Roboto", "Inter", ui-sans-serif, system-ui, sans-serif;
   
@@ -33,20 +33,72 @@
 
 @layer base {
   body {
-    font-family: var(--font-sans);
+    font-family: var(--font-sans) !important;
     background-color: var(--color-neutral-light);
     color: var(--color-neutral-dark);
   }
 
   /* Force Roboto font on all bold or semi-bold headers, tags, and utility classes */
   b, strong, h1, h2, h3, h4, h5, h6,
-  .font-medium:not(.font-mono),
-  .font-semibold:not(.font-mono),
-  .font-bold:not(.font-mono),
-  .font-extrabold:not(.font-mono),
-  .font-black:not(.font-mono) {
+  .font-semibold,
+  .font-bold,
+  .font-extrabold,
+  .font-black {
     font-family: var(--font-roboto) !important;
   }
+
+  /* Force Poppins on normal, regular and medium text (including numbers) */
+  p, span, div:not(.font-bold):not(.font-semibold):not(.font-extrabold):not(.font-black),
+  input, select, textarea, button:not(.font-bold):not(.font-semibold):not(.font-extrabold):not(.font-black),
+  .font-normal,
+  .font-medium,
+  .font-mono {
+    font-family: var(--font-sans) !important;
+  }
+}
+
+/* Bong bóng (Bubble Theme) Styles */
+.bubble-card {
+  background: rgba(255, 255, 255, 0.75);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  border: 1px solid rgba(255, 255, 255, 0.5);
+  border-radius: 1.5rem; /* ~rounded-3xl */
+  box-shadow: 0 10px 30px -10px rgba(15, 23, 42, 0.04), 
+              0 1px 3px rgba(15, 23, 42, 0.02);
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.bubble-card:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 20px 40px -15px rgba(15, 23, 42, 0.08), 
+              0 1px 3px rgba(15, 23, 42, 0.02);
+  background: rgba(255, 255, 255, 0.85);
+}
+
+.bubble-btn {
+  border-radius: 1rem; /* rounded-2xl */
+  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.bubble-btn:hover {
+  transform: scale(1.02);
+}
+
+.bubble-btn:active {
+  transform: scale(0.98);
+}
+
+/* Background floating glow effect for a nice bubbly look */
+.bubble-glow {
+  position: absolute;
+  width: 150px;
+  height: 150px;
+  border-radius: 50%;
+  background: radial-gradient(circle, rgba(14, 165, 233, 0.15) 0%, rgba(255, 255, 255, 0) 70%);
+  filter: blur(20px);
+  pointer-events: none;
+  z-index: 0;
 }
 
 /* Scrollbar styling */

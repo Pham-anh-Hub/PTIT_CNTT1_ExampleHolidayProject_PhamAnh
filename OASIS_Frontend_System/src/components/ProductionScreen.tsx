@@ -1,15 +1,40 @@
 import { useState, useTransition, useMemo } from "react";
-import { ProductionPlan, ProductionStage, Product, Material } from "../types";
+import { ProductionPlan, ProductionStage, Product, Material, MaterialImport, FinishedProductImport } from "../types";
 import { SAMPLE_PRODUCTS, SAMPLE_MATERIALS, SAMPLE_BOMS, SAMPLE_EMPLOYEES } from "../data";
-import { ArrowUp, ArrowDown, Hammer, PackageOpen, AlertTriangle, CheckCircle, Plus, ClipboardList } from "lucide-react";
+import { ArrowUp, ArrowDown, Hammer, PackageOpen, AlertTriangle, CheckCircle, Plus, ClipboardList, Warehouse, History, Layers, ClipboardCheck, ArrowUpRight } from "lucide-react";
 
 interface ProductionScreenProps {
   plans: ProductionPlan[];
   onAddPlan: (plan: ProductionPlan) => void;
+  materialImports: MaterialImport[];
+  onAddMaterialImport: (imp: MaterialImport) => void;
+  finishedImports: FinishedProductImport[];
+  onAddFinishedImport: (fimp: FinishedProductImport) => void;
 }
 
-export default function ProductionScreen({ plans, onAddPlan }: ProductionScreenProps) {
+export default function ProductionScreen({
+  plans,
+  onAddPlan,
+  materialImports,
+  onAddMaterialImport,
+  finishedImports,
+  onAddFinishedImport
+}: ProductionScreenProps) {
   const [, startTransition] = useTransition();
+
+  // Navigation Tab State
+  const [activeSubTab, setActiveSubTab] = useState<"planning" | "warehouse">("planning");
+
+  // Material Import Form States
+  const [importMatId, setImportMatId] = useState<string>(SAMPLE_MATERIALS[0].id);
+  const [importQty, setImportQty] = useState<number>(10);
+  const [importPrice, setImportPrice] = useState<number>(150000);
+  const [importSupplier, setImportSupplier] = useState<string>("Công ty Lâm sản Tây Nguyên");
+
+  // Finished Product Import Form States
+  const [importPlanId, setImportPlanId] = useState<string>(plans[0]?.id || "");
+  const [importFQty, setImportFQty] = useState<number>(10);
+  const [importQa, setImportQa] = useState<"PASSED" | "FAILED">("PASSED");
 
   // 1. Production Plan Drafting states
   const [selectedProductId, setSelectedProductId] = useState<string>(SAMPLE_PRODUCTS[0].id);
@@ -118,18 +143,44 @@ export default function ProductionScreen({ plans, onAddPlan }: ProductionScreenP
 
   return (
     <div className="space-y-6 animate-in fade-in duration-300" id="production-workspace-view">
-      {/* Title Segment */}
-      <div>
-        <h1 className="text-xl font-bold font-display text-slate-800 tracking-tight">
-          Lập Kế Hoạch Sản Xuất &amp; Thẩm Định Định Mức BOM
-        </h1>
-        <p className="text-xs text-slate-400 mt-1">
-          Trưởng phòng sản xuất thiết lập kế hoạch gia công, hệ thống tự động bóc tách định mức nguyên vật liệu (BOM) và đối chiếu tồn kho để cảnh báo thiếu hụt.
-        </p>
+      {/* Title Segment with Tabs */}
+      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 border-b border-slate-100 pb-4">
+        <div>
+          <h1 className="text-xl font-bold font-display text-slate-800 tracking-tight flex items-center">
+            <Warehouse className="w-5.5 h-5.5 text-slate-teal mr-2" />
+            Điều Hành Sản Xuất &amp; Quản Lý Định Mức BOM
+          </h1>
+          <p className="text-xs text-slate-400 mt-1">
+            Quản trị quy trình định mức nguyên vật liệu (BOM), lập lệnh gia công thợ mộc và kiểm soát xuất nhập kho vật tư, thành phẩm.
+          </p>
+        </div>
+
+        <div className="flex bg-slate-100 p-0.5 rounded-xl text-xs font-semibold text-slate-500 self-start md:self-center shrink-0 border border-slate-200">
+          <button
+            onClick={() => setActiveSubTab("planning")}
+            className={`px-3.5 py-2 rounded-lg transition-all flex items-center space-x-1.5 cursor-pointer ${
+              activeSubTab === "planning" ? "bg-white text-slate-teal shadow-xs font-bold" : "hover:text-slate-800"
+            }`}
+          >
+            <Layers className="w-3.5 h-3.5" />
+            <span>Kế hoạch &amp; Định mức BOM</span>
+          </button>
+          <button
+            onClick={() => setActiveSubTab("warehouse")}
+            className={`px-3.5 py-2 rounded-lg transition-all flex items-center space-x-1.5 cursor-pointer ${
+              activeSubTab === "warehouse" ? "bg-white text-slate-teal shadow-xs font-bold" : "hover:text-slate-800"
+            }`}
+          >
+            <Warehouse className="w-3.5 h-3.5" />
+            <span>Nhập Kho Vật Tư &amp; Thành Phẩm</span>
+          </button>
+        </div>
       </div>
 
-      {/* Main Grid: Form vs Material Requirements */}
-      <div className="grid grid-cols-1 lg:grid-cols-12 gap-6" id="production-dashboard-grid">
+      {activeSubTab === "planning" ? (
+        <>
+          {/* Main Grid: Form vs Material Requirements */}
+          <div className="grid grid-cols-1 lg:grid-cols-12 gap-6" id="production-dashboard-grid">
         {/* Left Column: Form Lập Kế Hoạch - 6 Columns */}
         <div className="lg:col-span-6 bg-white border border-slate-100 p-6 rounded-2xl shadow-sm space-y-4">
           <div className="flex items-center space-x-2 text-slate-700 font-bold text-xs pb-3 border-b border-slate-50">
@@ -386,6 +437,306 @@ export default function ProductionScreen({ plans, onAddPlan }: ProductionScreenP
           </table>
         </div>
       </div>
+      </>
+    ) : (
+      /* WAREHOUSE SUB-TAB */
+      <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 animate-in fade-in duration-300" id="warehouse-sub-tab">
+        {/* Left Hand: Raw Material Receipts System - 6 Columns */}
+        <div className="lg:col-span-6 bg-white border border-slate-100 p-6 rounded-2xl shadow-sm space-y-6">
+          <div className="flex items-center justify-between border-b border-slate-50 pb-3">
+            <div className="flex items-center space-x-2 text-slate-700 font-bold text-xs">
+              <Warehouse className="w-4 h-4 text-slate-teal" />
+              <span>Nhập Kho Nguyên Vật Tư (Mua Hàng)</span>
+            </div>
+            <span className="text-[10px] bg-slate-50 text-slate-teal px-2 py-0.5 rounded font-mono font-semibold">
+              Kho vật tư thô
+            </span>
+          </div>
+
+          {/* Form to add material import */}
+          <div className="bg-slate-50/50 p-4 rounded-xl border border-slate-100 space-y-4">
+            <h3 className="text-xs font-bold text-slate-600 flex items-center">
+              <Plus className="w-3.5 h-3.5 text-slate-teal mr-1" />
+              Lập Phiếu Nhập Vật Tư Mới
+            </h3>
+            
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-1">
+                <label className="text-[10px] text-slate-400 font-bold uppercase tracking-wider block">Chọn vật tư</label>
+                <select
+                  value={importMatId}
+                  onChange={(e) => {
+                    const id = e.target.value;
+                    setImportMatId(id);
+                    // Autofill default prices
+                    if (id === "mat-1") setImportPrice(8500000); // Gỗ Sồi
+                    else if (id === "mat-2") setImportPrice(1500);  // Ốc vít
+                    else if (id === "mat-3") setImportPrice(6500000); // Gỗ Thông
+                    else if (id === "mat-4") setImportPrice(1200000); // Sơn PU
+                    else if (id === "mat-5") setImportPrice(85000);   // Bản lề
+                  }}
+                  className="w-full text-xs border border-slate-100 hover:border-slate-200 rounded p-2 focus:outline-none focus:border-slate-teal"
+                >
+                  {SAMPLE_MATERIALS.map((m) => (
+                    <option key={m.id} value={m.id}>{m.name} ({m.code})</option>
+                  ))}
+                </select>
+              </div>
+
+              <div className="space-y-1">
+                <label className="text-[10px] text-slate-400 font-bold uppercase tracking-wider block">Nhà cung cấp</label>
+                <input
+                  type="text"
+                  value={importSupplier}
+                  onChange={(e) => setImportSupplier(e.target.value)}
+                  placeholder="Ví dụ: Công ty Lâm sản Tây Nguyên"
+                  className="w-full text-xs border border-slate-100 hover:border-slate-200 rounded p-2 focus:outline-none focus:border-slate-teal font-medium"
+                />
+              </div>
+
+              <div className="space-y-1">
+                <label className="text-[10px] text-slate-400 font-bold uppercase tracking-wider block">Số lượng nhập</label>
+                <input
+                  type="number"
+                  value={importQty}
+                  onChange={(e) => setImportQty(Math.max(1, Number(e.target.value)))}
+                  className="w-full text-xs border border-slate-100 hover:border-slate-200 rounded p-2 focus:outline-none focus:border-slate-teal font-mono font-semibold"
+                />
+              </div>
+
+              <div className="space-y-1">
+                <label className="text-[10px] text-slate-400 font-bold uppercase tracking-wider block">Đơn giá nhập (VNĐ)</label>
+                <input
+                  type="number"
+                  value={importPrice}
+                  onChange={(e) => setImportPrice(Math.max(0, Number(e.target.value)))}
+                  className="w-full text-xs border border-slate-100 hover:border-slate-200 rounded p-2 focus:outline-none focus:border-slate-teal font-mono font-semibold text-slate-700"
+                />
+              </div>
+            </div>
+
+            <div className="flex justify-between items-center pt-2">
+              <span className="text-xs text-slate-400">
+                Thành tiền: <span className="font-mono text-slate-teal font-bold">{(importQty * importPrice).toLocaleString()} đ</span>
+              </span>
+              <button
+                onClick={() => {
+                  const targetMat = SAMPLE_MATERIALS.find(m => m.id === importMatId);
+                  if (!targetMat) return;
+                  const newImp: MaterialImport = {
+                    id: `imp-${Date.now()}`,
+                    code: `PNK-VT-${Math.floor(100 + Math.random() * 900)}`,
+                    materialId: importMatId,
+                    materialName: targetMat.name,
+                    materialCode: targetMat.code,
+                    quantity: importQty,
+                    unitPrice: importPrice,
+                    totalAmount: importQty * importPrice,
+                    supplier: importSupplier,
+                    importDate: new Date().toISOString().split('T')[0],
+                    status: 'APPROVED'
+                  };
+                  onAddMaterialImport(newImp);
+                  alert(`Đã ghi nhận Phiếu Nhập Vật Tư ${newImp.code} nhập kho ${importQty} ${targetMat.unit} ${targetMat.name} từ ${importSupplier}.`);
+                }}
+                className="bg-slate-teal hover:bg-slate-teal-dark text-white text-[11px] font-bold px-4 py-2 rounded-lg cursor-pointer flex items-center space-x-1"
+              >
+                <ArrowUpRight className="w-3.5 h-3.5" />
+                <span>Ghi nhận Nhập kho</span>
+              </button>
+            </div>
+          </div>
+
+          {/* List of Material Imports */}
+          <div className="space-y-3">
+            <h3 className="text-xs font-bold text-slate-600 flex items-center">
+              <History className="w-3.5 h-3.5 text-slate-teal mr-1" />
+              Lịch Sử Nhập Kho Vật Tư Gần Đây
+            </h3>
+            <div className="overflow-x-auto border border-slate-100 rounded-xl">
+              <table className="w-full text-left text-xs text-slate-600">
+                <thead>
+                  <tr className="bg-slate-50 text-[10px] text-slate-400 uppercase font-bold border-b border-slate-100">
+                    <th className="p-3">Mã phiếu</th>
+                    <th className="p-3">Vật tư / NCC</th>
+                    <th className="p-3 text-right">SL nhập</th>
+                    <th className="p-3 text-right">Tổng tiền</th>
+                    <th className="p-3 text-center">Trạng thái</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-slate-50">
+                  {materialImports.map((imp) => (
+                    <tr key={imp.id} className="hover:bg-slate-50/50">
+                      <td className="p-3 font-mono text-[10px] font-bold text-slate-teal">{imp.code}</td>
+                      <td className="p-3">
+                        <div className="font-bold text-slate-700">{imp.materialName}</div>
+                        <div className="text-[10px] text-slate-400">{imp.supplier} • {imp.importDate}</div>
+                      </td>
+                      <td className="p-3 text-right font-mono font-semibold">{imp.quantity.toLocaleString()}</td>
+                      <td className="p-3 text-right font-mono font-bold text-slate-700">{imp.totalAmount.toLocaleString()}đ</td>
+                      <td className="p-3 text-center">
+                        <span className="bg-emerald-50 text-emerald-600 text-[9px] font-bold px-1.5 py-0.5 rounded-full inline-flex items-center">
+                          <CheckCircle className="w-2.5 h-2.5 mr-0.5" />
+                          Đã vào kho
+                        </span>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+
+        {/* Right Hand: Finished Product Receipts System - 6 Columns */}
+        <div className="lg:col-span-6 bg-white border border-slate-100 p-6 rounded-2xl shadow-sm space-y-6">
+          <div className="flex items-center justify-between border-b border-slate-50 pb-3">
+            <div className="flex items-center space-x-2 text-slate-700 font-bold text-xs">
+              <ClipboardCheck className="w-4 h-4 text-slate-teal" />
+              <span>Nghiệm Thu &amp; Nhập Kho Thành Phẩm</span>
+            </div>
+            <span className="text-[10px] bg-slate-50 text-slate-teal px-2 py-0.5 rounded font-mono font-semibold">
+              Kho thành phẩm
+            </span>
+          </div>
+
+          {/* Form to add finished goods import */}
+          <div className="bg-slate-50/50 p-4 rounded-xl border border-slate-100 space-y-4">
+            <h3 className="text-xs font-bold text-slate-600 flex items-center">
+              <Plus className="w-3.5 h-3.5 text-slate-teal mr-1" />
+              Nghiệm Thu Kế Hoạch Sản Xuất
+            </h3>
+
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-1 col-span-2">
+                <label className="text-[10px] text-slate-400 font-bold uppercase tracking-wider block">Chọn Lệnh / Kế hoạch chạy</label>
+                <select
+                  value={importPlanId}
+                  onChange={(e) => {
+                    const pid = e.target.value;
+                    setImportPlanId(pid);
+                    const planObj = plans.find(p => p.id === pid);
+                    if (planObj) setImportFQty(planObj.plannedQuantity);
+                  }}
+                  className="w-full text-xs border border-slate-100 hover:border-slate-200 rounded p-2 focus:outline-none focus:border-slate-teal"
+                >
+                  <option value="">-- Chọn lệnh sản xuất active --</option>
+                  {plans.filter(p => p.status === "PENDING" || p.status === "RUNNING").map((p) => (
+                    <option key={p.id} value={p.id}>{p.code} - {p.productName} ({p.plannedQuantity} cái)</option>
+                  ))}
+                </select>
+              </div>
+
+              <div className="space-y-1">
+                <label className="text-[10px] text-slate-400 font-bold uppercase tracking-wider block">Số lượng đạt chuẩn</label>
+                <input
+                  type="number"
+                  value={importFQty}
+                  onChange={(e) => setImportFQty(Math.max(1, Number(e.target.value)))}
+                  className="w-full text-xs border border-slate-100 hover:border-slate-200 rounded p-2 focus:outline-none focus:border-slate-teal font-mono font-semibold"
+                />
+              </div>
+
+              <div className="space-y-1">
+                <label className="text-[10px] text-slate-400 font-bold uppercase tracking-wider block">Đánh giá chất lượng QA</label>
+                <select
+                  value={importQa}
+                  onChange={(e) => setImportQa(e.target.value as any)}
+                  className="w-full text-xs border border-slate-100 hover:border-slate-200 rounded p-2 focus:outline-none focus:border-slate-teal"
+                >
+                  <option value="PASSED">ĐẠT CHUẨN (PASSED)</option>
+                  <option value="FAILED">LỖI KỸ THUẬT (REJECTED)</option>
+                </select>
+              </div>
+            </div>
+
+            <div className="flex justify-between items-center pt-2">
+              <span className="text-xs text-slate-400">
+                Nhân viên kiểm tra: <span className="font-semibold text-slate-600">Phạm Minh Hoàng (KCS)</span>
+              </span>
+              <button
+                onClick={() => {
+                  const targetPlan = plans.find(p => p.id === importPlanId);
+                  if (!targetPlan) {
+                    alert("Vui lòng chọn lệnh sản xuất để nghiệm thu!");
+                    return;
+                  }
+                  const productObj = SAMPLE_PRODUCTS.find(p => p.id === targetPlan.productId);
+                  const newFimp: FinishedProductImport = {
+                    id: `fimp-${Date.now()}`,
+                    code: `PNK-TP-${Math.floor(100 + Math.random() * 900)}`,
+                    planCode: targetPlan.code,
+                    productId: targetPlan.productId,
+                    productName: targetPlan.productName,
+                    productCode: productObj?.code || "SP-MOCK",
+                    quantity: importFQty,
+                    unit: productObj?.unit || "Cái",
+                    qaStatus: importQa,
+                    importDate: new Date().toISOString().split('T')[0],
+                    operatorName: "Phạm Minh Hoàng"
+                  };
+                  onAddFinishedImport(newFimp);
+                  
+                  // Also mark the production plan status as completed in the UI
+                  targetPlan.status = "COMPLETED";
+
+                  alert(`Đã ghi nhận Phiếu Nghiệm Thu ${newFimp.code} cho kế hoạch ${targetPlan.code}. Trạng thái QA: ${importQa === 'PASSED' ? 'ĐẠT' : 'KHÔNG ĐẠT'} và nhập kho ${importFQty} thành phẩm.`);
+                }}
+                className="bg-slate-teal hover:bg-slate-teal-dark text-white text-[11px] font-bold px-4 py-2 rounded-lg cursor-pointer flex items-center space-x-1"
+              >
+                <CheckCircle className="w-3.5 h-3.5" />
+                <span>Hoàn thành &amp; Nhập kho</span>
+              </button>
+            </div>
+          </div>
+
+          {/* List of Finished Goods Imports */}
+          <div className="space-y-3">
+            <h3 className="text-xs font-bold text-slate-600 flex items-center">
+              <History className="w-3.5 h-3.5 text-slate-teal mr-1" />
+              Lịch Sử Nghiệm Thu Thành Phẩm
+            </h3>
+            <div className="overflow-x-auto border border-slate-100 rounded-xl">
+              <table className="w-full text-left text-xs text-slate-600">
+                <thead>
+                  <tr className="bg-slate-50 text-[10px] text-slate-400 uppercase font-bold border-b border-slate-100">
+                    <th className="p-3">Mã phiếu</th>
+                    <th className="p-3">Sản phẩm / Lệnh</th>
+                    <th className="p-3 text-right">SL nhập</th>
+                    <th className="p-3 text-center">Đánh giá QA</th>
+                    <th className="p-3">Người KCS</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-slate-50">
+                  {finishedImports.map((fimp) => (
+                    <tr key={fimp.id} className="hover:bg-slate-50/50">
+                      <td className="p-3 font-mono text-[10px] font-bold text-slate-teal">{fimp.code}</td>
+                      <td className="p-3">
+                        <div className="font-bold text-slate-700">{fimp.productName}</div>
+                        <div className="text-[10px] text-slate-400">Lệnh: {fimp.planCode} • {fimp.importDate}</div>
+                      </td>
+                      <td className="p-3 text-right font-mono font-semibold">{fimp.quantity} {fimp.unit}</td>
+                      <td className="p-3 text-center">
+                        {fimp.qaStatus === "PASSED" ? (
+                          <span className="bg-emerald-50 text-emerald-600 text-[9px] font-bold px-2 py-0.5 rounded-full">
+                            Đạt chuẩn QA
+                          </span>
+                        ) : (
+                          <span className="bg-rose-50 text-rose-600 text-[9px] font-bold px-2 py-0.5 rounded-full">
+                            Phát hiện lỗi QA
+                          </span>
+                        )}
+                      </td>
+                      <td className="p-3 font-medium text-slate-500">{fimp.operatorName}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+      </div>
+    )}
     </div>
   );
 }

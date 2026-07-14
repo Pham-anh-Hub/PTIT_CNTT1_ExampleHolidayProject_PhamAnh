@@ -48,5 +48,18 @@ public class AuthController {
         LoginResponse response = authService.selectActiveContext(request);
         return ResponseEntity.ok(ApiResponse.success("Xác nhận ngữ cảnh làm việc thành công.", response));
     }
+
+    /**
+     * API Đăng xuất hệ thống (Logout).
+     * Yêu cầu xác thực token JWT, sau đó đưa token vào danh sách đen trên Redis để thu hồi hiệu lực.
+     * 
+     * @param request HTTP Servlet Request để trích xuất header
+     * @return Phản hồi trống báo đăng xuất thành công
+     */
+    @PostMapping("/logout")
+    public ResponseEntity<ApiResponse<Void>> logout(jakarta.servlet.http.HttpServletRequest request) {
+        authService.logout(request);
+        return ResponseEntity.ok(ApiResponse.success("Đăng xuất thành công.", null));
+    }
 }
 

@@ -157,3 +157,42 @@ export interface PayslipItem {
     amount: number;
   }[];
 }
+
+export interface MaterialImport {
+  id: string;
+  code: string;
+  materialId: string;
+  materialName: string;
+  materialCode: string;
+  quantity: number;
+  unitPrice: number;
+  totalAmount: number;
+  supplier: string;
+  importDate: string;
+  status: 'PENDING' | 'APPROVED';
+}
+
+export interface FinishedProductImport {
+  id: string;
+  code: string;
+  planCode: string;
+  productId: string;
+  productName: string;
+  productCode: string;
+  quantity: number;
+  unit: string;
+  qaStatus: 'PASSED' | 'FAILED';
+  importDate: string;
+  operatorName: string;
+}
+
+export interface SupplierPayable {
+  id: string;
+  supplierName: string;
+  totalAmount: number;
+  paidAmount: number;
+  remainingAmount: number;
+  dueDate: string;
+  status: 'DANGER' | 'WARNING' | 'GOOD';
+}
+

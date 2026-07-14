@@ -20,8 +20,10 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.util.ArrayList;
+import java.util.Date;
 import java.util.List;
 import java.util.stream.Collectors;
+import oasis_system.oasis_system.core.exception.TokenInvalidException;
 
 /**
  * AuthService xử lý các nghiệp vụ liên quan đến Đăng ký doanh nghiệp mới
@@ -47,6 +49,7 @@ public class AuthService {
     private final PasswordEncoder passwordEncoder;
     private final AuthenticationManager authenticationManager;
     private final JwtService jwtService;
+    private final TokenBlacklistService tokenBlacklistService;
 
     /**
      * Quy trình đăng ký một doanh nghiệp mới trong mô hình SaaS Multi-tenant.
@@ -57,6 +60,10 @@ public class AuthService {
     @Transactional
     public Company registerCompany(CompanyRegisterDto dto) {
         // 1. Kiểm tra tính hợp lệ và duy nhất của dữ liệu đầu vào
+        if (dto.getCompanyCode().trim().equalsIgnoreCase("SYSTEM")) {
+            throw new IllegalArgumentException("Mã doanh nghiệp 'SYSTEM' là mã bảo mật nội bộ của hệ thống, không thể đăng ký.");
+        }
+
         if (companyRepository.existsByCode(dto.getCompanyCode())) {
             throw new IllegalArgumentException("Mã doanh nghiệp '" + dto.getCompanyCode() + "' đã tồn tại trên hệ thống.");
         }
@@ -258,6 +265,10 @@ public class AuthService {
             throw new IllegalStateException("Tài khoản của bạn hiện đang bị vô hiệu hóa.");
         }
 
+        if (user.getCompany() != null && !user.getCompany().getIsActive()) {
+            throw new IllegalStateException("Doanh nghiệp của bạn hiện đang bị tạm ngưng cung cấp dịch vụ.");
+        }
+
         // Truy vấn danh sách kiêm nhiệm và xác thực ngữ cảnh được lựa chọn
         List<UserRoleDepartment> urds = userRoleDepartmentRepository.findByUserId(user.getId());
         UserRoleDepartment targetUrd = urds.stream()
@@ -304,5 +315,41 @@ public class AuthService {
                 .userInfo(userInfo)
                 .activeContext(activeContext)
                 .build();
+    }
+
+    /**
+     * Đăng xuất và thu hồi Token JWT bằng cách lưu vào danh sách đen trong Redis.
+     * 
+     * @param request HTTP Servlet Request để trích xuất Header Authorization
+     */
+    public void logout(jakarta.servlet.http.HttpServletRequest request) {
+        String header = request.getHeader("Authorization");
+        if (header == null || !header.startsWith("Bearer ")) {
+            throw new TokenInvalidException("Token không hợp lệ, vui lòng kiểm tra lại");
+        }
+
+        String accessToken = header.substring(7);
+
+        try {
+            // Trích xuất ngày hết hạn của token từ chữ ký
+            Date expiration = jwtService.extractExpiration(accessToken);
+            long remainingMs = expiration.getTime() - System.currentTimeMillis();
+
+            // Nếu token chưa thực sự hết hạn, ghi nhận vào blacklist của Redis
+            if (remainingMs > 0) {
+                tokenBlacklistService.blacklistToken(accessToken, remainingMs);
+            }
+        } catch (Exception e) {
+            throw new TokenInvalidException("Không thể xử lý token với blacklist: " + e.getMessage());
+        }
+    }
+
+    /**
+     * Lấy danh sách tất cả doanh nghiệp trong hệ thống (SaaS Tenants).
+     */
+    public List<Company> getAllCompanies() {
+        return companyRepository.findAll().stream()
+                .filter(c -> !c.getCode().equalsIgnoreCase("SYSTEM"))
+                .collect(Collectors.toList());
     }
 }

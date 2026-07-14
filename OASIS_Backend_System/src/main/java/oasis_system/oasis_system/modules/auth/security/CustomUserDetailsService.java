@@ -45,6 +45,10 @@ public class CustomUserDetailsService implements UserDetailsService {
             throw new UsernameNotFoundException("Tài khoản hiện đã bị vô hiệu hóa.");
         }
 
+        if (user.getCompany() != null && !user.getCompany().getIsActive()) {
+            throw new UsernameNotFoundException("Doanh nghiệp của bạn hiện đang bị tạm ngưng cung cấp dịch vụ.");
+        }
+
         // 2. Tìm danh sách vai trò kiêm nhiệm tại các phòng ban của người dùng
         List<UserRoleDepartment> roleDepts = userRoleDepartmentRepository.findByUserId(user.getId());
         

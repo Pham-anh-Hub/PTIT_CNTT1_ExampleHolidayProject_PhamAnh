@@ -1,23 +1,6 @@
-import { Employee, Contract, SalesOrder, Product, Material, ProductBOM, ProductionPlan, LeaveRequest, ClockLog, PayslipItem } from "./types";
+import { Employee, Contract, SalesOrder, Product, Material, ProductBOM, ProductionPlan, LeaveRequest, ClockLog, PayslipItem, MaterialImport, FinishedProductImport, SupplierPayable } from "./types";
 
-export const SAMPLE_TENANTS = [
-  {
-    id: "tenant-1",
-    name: "Cơ khí & Nội Thất Gỗ Việt",
-    industry: "Sản xuất Đồ gỗ & Kim khí mỹ nghệ",
-    subdomain: "goviet.saas-erp.vn",
-    logo: "GV",
-    taxCode: "0109283746"
-  },
-  {
-    id: "tenant-2",
-    name: "May mặc Thăng Long JSC",
-    industry: "Dệt may & Xuất khẩu thời trang",
-    subdomain: "thanglonggarment.saas-erp.vn",
-    logo: "TL",
-    taxCode: "0312456789"
-  }
-];
+export const SAMPLE_TENANTS: any[] = [];
 
 export const DEPARTMENTS = [
   { id: "BOD", name: "Ban Giám Đốc (BOD)" },
@@ -380,3 +363,118 @@ export const SAMPLE_PAYSLIPS: PayslipItem[] = [
     ]
   }
 ];
+
+export const INITIAL_MATERIAL_IMPORTS: MaterialImport[] = [
+  {
+    id: "imp-1",
+    code: "PNK-VT-001",
+    materialId: "mat-1",
+    materialName: "Gỗ sồi Mỹ nhập khẩu",
+    materialCode: "VT-GSO-01",
+    quantity: 20,
+    unitPrice: 8500000,
+    totalAmount: 170000000,
+    supplier: "Công ty Lâm sản Tây Nguyên",
+    importDate: "2026-07-02",
+    status: "APPROVED"
+  },
+  {
+    id: "imp-2",
+    code: "PNK-VT-002",
+    materialId: "mat-4",
+    materialName: "Sơn bóng PU cao cấp",
+    materialCode: "VT-SON-04",
+    quantity: 40,
+    unitPrice: 1200000,
+    totalAmount: 48000000,
+    supplier: "Sơn Kansai Việt Nam",
+    importDate: "2026-07-04",
+    status: "APPROVED"
+  },
+  {
+    id: "imp-3",
+    code: "PNK-VT-003",
+    materialId: "mat-2",
+    materialName: "Ốc vít & Phụ kiện liên kết",
+    materialCode: "VT-OVI-02",
+    quantity: 2000,
+    unitPrice: 1500,
+    totalAmount: 3000000,
+    supplier: "Kim khí Phú Tiến",
+    importDate: "2026-07-05",
+    status: "APPROVED"
+  }
+];
+
+export const INITIAL_FINISHED_IMPORTS: FinishedProductImport[] = [
+  {
+    id: "fimp-1",
+    code: "PNK-TP-001",
+    planCode: "KHSX-2026-01",
+    productId: "prod-1",
+    productName: "Bàn ăn Gỗ Sồi 6 ghế Premium",
+    productCode: "SP-BAS-01",
+    quantity: 10,
+    unit: "Bộ",
+    qaStatus: "PASSED",
+    importDate: "2026-07-09",
+    operatorName: "Phạm Minh Hoàng"
+  },
+  {
+    id: "fimp-2",
+    code: "PNK-TP-002",
+    planCode: "KHSX-2026-01",
+    productId: "prod-1",
+    productName: "Bàn ăn Gỗ Sồi 6 ghế Premium",
+    productCode: "SP-BAS-01",
+    quantity: 1,
+    unit: "Bộ",
+    qaStatus: "FAILED",
+    importDate: "2026-07-09",
+    operatorName: "Phạm Minh Hoàng"
+  },
+  {
+    id: "fimp-3",
+    code: "PNK-TP-003",
+    planCode: "KHSX-2026-02",
+    productId: "prod-3",
+    productName: "Sofa Da bò Ý Nhập khẩu",
+    productCode: "SP-SFD-03",
+    quantity: 3,
+    unit: "Bộ",
+    qaStatus: "PASSED",
+    importDate: "2026-07-10",
+    operatorName: "Phạm Minh Hoàng"
+  }
+];
+
+export const INITIAL_SUPPLIER_PAYABLES: SupplierPayable[] = [
+  {
+    id: "spay-1",
+    supplierName: "Công ty Lâm sản Tây Nguyên",
+    totalAmount: 170000000,
+    paidAmount: 100000000,
+    remainingAmount: 70000000,
+    dueDate: "2026-07-25",
+    status: "WARNING"
+  },
+  {
+    id: "spay-2",
+    supplierName: "Sơn Kansai Việt Nam",
+    totalAmount: 48000000,
+    paidAmount: 48000000,
+    remainingAmount: 0,
+    dueDate: "2026-07-10",
+    status: "GOOD"
+  },
+  {
+    id: "spay-3",
+    supplierName: "Kim khí Phú Tiến",
+    totalAmount: 3000000,
+    paidAmount: 0,
+    remainingAmount: 3000000,
+    dueDate: "2026-07-15",
+    status: "WARNING"
+  }
+];
+
