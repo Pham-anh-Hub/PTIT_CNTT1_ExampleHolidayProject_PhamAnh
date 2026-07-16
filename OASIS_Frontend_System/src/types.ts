@@ -1,10 +1,17 @@
 export interface Tenant {
   id: string;
   name: string;
-  industry: string;
-  subdomain: string;
-  logo: string;
-  taxCode: string;
+  industry?: string;
+  subdomain?: string;
+  logo?: string;
+  taxCode?: string;
+  code?: string;
+  address?: string;
+  phone?: string;
+  email?: string;
+  isActive?: boolean;
+  subscriptionPlan?: string;
+  createdAt?: string;
 }
 
 export interface User {

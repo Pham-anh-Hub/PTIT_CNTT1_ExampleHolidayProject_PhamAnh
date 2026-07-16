@@ -59,28 +59,44 @@ public class JwtService {
      * Trích xuất mã Doanh nghiệp (companyId) từ token để thực hiện cách ly dữ liệu.
      */
     public Long extractCompanyId(String token) {
-        return extractClaim(token, claims -> claims.get("companyId", Long.class));
+        return extractClaim(token, claims -> {
+            Object val = claims.get("companyId");
+            if (val == null) return null;
+            return ((Number) val).longValue();
+        });
     }
 
     /**
      * Trích xuất mã vai trò (activeRoleId) của phiên làm việc hiện tại.
      */
     public Long extractRoleId(String token) {
-        return extractClaim(token, claims -> claims.get("roleId", Long.class));
+        return extractClaim(token, claims -> {
+            Object val = claims.get("roleId");
+            if (val == null) return null;
+            return ((Number) val).longValue();
+        });
     }
 
     /**
      * Trích xuất mã phòng ban (activeDepartmentId) của phiên làm việc hiện tại.
      */
     public Long extractDepartmentId(String token) {
-        return extractClaim(token, claims -> claims.get("departmentId", Long.class));
+        return extractClaim(token, claims -> {
+            Object val = claims.get("departmentId");
+            if (val == null) return null;
+            return ((Number) val).longValue();
+        });
     }
 
     /**
      * Trích xuất mã User ID từ token.
      */
     public Long extractUserId(String token) {
-        return extractClaim(token, claims -> claims.get("userId", Long.class));
+        return extractClaim(token, claims -> {
+            Object val = claims.get("userId");
+            if (val == null) return null;
+            return ((Number) val).longValue();
+        });
     }
 
     /**

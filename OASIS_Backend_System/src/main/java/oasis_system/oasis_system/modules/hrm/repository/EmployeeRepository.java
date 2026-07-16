@@ -32,4 +32,28 @@ public interface EmployeeRepository extends JpaRepository<Employee, Long> {
      * Tìm kiếm nhân viên theo địa chỉ email và ID doanh nghiệp.
      */
     Optional<Employee> findByEmailAndCompanyId(String email, Long companyId);
+
+    /**
+     * Tìm kiếm và lọc nhân viên động theo tên/mã, phòng ban và trạng thái trong doanh nghiệp.
+     */
+    @org.springframework.data.jpa.repository.Query("SELECT e FROM Employee e WHERE e.company.id = :companyId " +
+           "AND (:search IS NULL OR LOWER(e.fullname) LIKE LOWER(CONCAT('%', :search, '%')) OR LOWER(e.employeeCode) LIKE LOWER(CONCAT('%', :search, '%'))) " +
+           "AND (:departmentId IS NULL OR e.department.id = :departmentId) " +
+           "AND (:status IS NULL OR e.status = :status)")
+    List<Employee> findEmployeesWithFilters(
+            @org.springframework.data.repository.query.Param("companyId") Long companyId,
+            @org.springframework.data.repository.query.Param("search") String search,
+            @org.springframework.data.repository.query.Param("departmentId") Long departmentId,
+            @org.springframework.data.repository.query.Param("status") String status
+    );
+
+    /**
+     * Kiểm tra xem có bất kỳ nhân viên nào đang thuộc phòng ban này không.
+     */
+    boolean existsByDepartmentId(Long departmentId);
+
+    /**
+     * Kiểm tra xem có bất kỳ nhân viên nào đang có chức vụ này không.
+     */
+    boolean existsByPositionId(Long positionId);
 }

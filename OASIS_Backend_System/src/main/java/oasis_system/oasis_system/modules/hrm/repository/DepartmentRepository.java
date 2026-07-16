@@ -22,4 +22,14 @@ public interface DepartmentRepository extends JpaRepository<Department, Long> {
      * Lấy danh sách các phòng ban trực thuộc doanh nghiệp.
      */
     List<Department> findByCompanyId(Long companyId);
+
+    /**
+     * Kiểm tra xem mã phòng ban đã tồn tại trong doanh nghiệp chưa.
+     */
+    boolean existsByCodeAndCompanyId(String code, Long companyId);
+
+    /**
+     * Kiểm tra xem phòng ban có bất kỳ phòng ban con trực thuộc nào không.
+     */
+    boolean existsByParentDepartmentId(Long parentId);
 }

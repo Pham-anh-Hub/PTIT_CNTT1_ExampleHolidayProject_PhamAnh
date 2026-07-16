@@ -13,6 +13,10 @@ interface NavbarProps {
   onNavigateToTab: (tabId: string) => void;
   currentUser: UserType;
   onLogout: () => void;
+  liveNotifications?: any[];
+  liveUnreadCount?: number;
+  onMarkNotificationRead?: (id: number) => void;
+  onMarkAllNotificationsRead?: () => void;
 }
 
 export default function Navbar({
@@ -25,7 +29,11 @@ export default function Navbar({
   pendingLeaves,
   onNavigateToTab,
   currentUser,
-  onLogout
+  onLogout,
+  liveNotifications = [],
+  liveUnreadCount = 0,
+  onMarkNotificationRead,
+  onMarkAllNotificationsRead
 }: NavbarProps) {
   const [showNotifDropdown, setShowNotifDropdown] = useState(false);
   const [showUserDropdown, setShowUserDropdown] = useState(false);
@@ -43,59 +51,38 @@ export default function Navbar({
   const isSuperAdmin = cleanRole === "SUPER_ADMIN" || cleanRole.includes("SUPER_ADMIN") || cleanRole.includes("TOÀN BỘ HỆ THỐNG SAAS") || cleanRole.includes("QUẢN TRỊ HỆ THỐNG");
   const isBOD = cleanRole === "BOD / OWNER" || cleanRole === "DIRECTOR" || cleanRole === "ADMIN_DN";
 
-  let notificationsCount = 0;
-  let notificationsList: { title: string; desc: string; bg: string; text: string; icon: any }[] = [];
-
-  if (isBOD) {
-    notificationsCount = pendingApprovalsCount;
-    if (pendingOrders > 0) {
-      notificationsList.push({
-        title: `Có ${pendingOrders} Đơn hàng vượt ngưỡng`,
-        desc: "Vượt mức tiền quy định (> 50 triệu) đang chờ Giám đốc duyệt.",
-        bg: "bg-amber-50 border-amber-100",
+  // Lấy chi tiết icon và giao diện của thông báo real-time
+  const getNotifDetails = (type: string, isRead: boolean) => {
+    if (isRead) {
+      return {
+        bg: "bg-slate-50/50 border-slate-100/60 opacity-60",
+        text: "text-slate-400",
+        icon: FileText
+      };
+    }
+    const t = (type || "").toUpperCase();
+    if (t === "ORDER") {
+      return {
+        bg: "bg-amber-50/85 border-amber-100/70",
         text: "text-amber-700",
         icon: AlertTriangle
-      });
+      };
     }
-    if (pendingContracts > 0) {
-      notificationsList.push({
-        title: `Có ${pendingContracts} Hợp đồng lao động mới`,
-        desc: "Nhân sự vừa gửi dự thảo chờ phê duyệt kỳ thử việc.",
-        bg: "bg-sky-50 border-sky-100",
+    if (t === "CONTRACT") {
+      return {
+        bg: "bg-sky-50/85 border-sky-100/70",
         text: "text-sky-700",
         icon: FileText
-      });
+      };
     }
-    if (pendingLeaves > 0) {
-      notificationsList.push({
-        title: `Có ${pendingLeaves} Đơn nghỉ phép của công nhân`,
-        desc: "Nhật ký sản xuất ghi nhận đơn xin phép mới.",
-        bg: "bg-rose-50 border-rose-100",
-        text: "text-rose-700",
-        icon: Calendar
-      });
-    }
-  } else if (isSuperAdmin) {
-    notificationsCount = 2;
-    notificationsList = [
-      {
-        title: "Đăng ký doanh nghiệp thành công",
-        desc: "Đối tác HAIPHONG đã được kích hoạt thành công trên phân vùng SaaS.",
-        bg: "bg-emerald-50 border-emerald-100",
-        text: "text-emerald-700",
-        icon: CheckCircle2
-      },
-      {
-        title: "Tài nguyên máy chủ ổn định",
-        desc: "Uptime SLA đạt 99.99%, lưu lượng API gateway nằm trong ngưỡng an toàn.",
-        bg: "bg-sky-50 border-sky-100",
-        text: "text-sky-700",
-        icon: ShieldAlert
-      }
-    ];
-  } else {
-    notificationsCount = 0;
-  }
+    return {
+      bg: "bg-rose-50/85 border-rose-100/70",
+      text: "text-rose-700",
+      icon: Calendar
+    };
+  };
+
+  const notificationsCount = isBOD ? liveUnreadCount : (isSuperAdmin ? 2 : 0);
 
   // Chọn ảnh chân dung thực tế dựa trên vai trò
   const avatarUrl = isSuperAdmin
@@ -165,11 +152,19 @@ export default function Navbar({
               <div className="absolute right-0 mt-3 w-80 bg-white rounded-3xl shadow-xl border border-slate-100/80 py-3 z-50 animate-in fade-in duration-200" id="notifications-panel">
               <div className="px-4 py-2 border-b border-slate-100 flex justify-between items-center">
                 <span className="text-xs font-bold text-slate-800">
-                  {isSuperAdmin ? "Cảnh báo hệ thống" : "Quy trình duyệt cần xử lý"} ({notificationsCount})
+                  {isSuperAdmin ? "Cảnh báo hệ thống" : "Hộp thư thông báo"} ({notificationsCount})
                 </span>
-                <span className="text-[9px] bg-slate-teal-light text-slate-teal px-2 py-0.5 rounded-full font-bold uppercase tracking-wider">
-                  {isSuperAdmin ? "SaaS" : "BOD Inbox"}
-                </span>
+                {isBOD && liveUnreadCount > 0 && onMarkAllNotificationsRead && (
+                  <button
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      onMarkAllNotificationsRead();
+                    }}
+                    className="text-[9px] text-slate-teal font-extrabold hover:underline uppercase tracking-wider cursor-pointer bg-transparent border-0"
+                  >
+                    Đọc tất cả
+                  </button>
+                )}
               </div>
               
               <div className="max-h-72 overflow-y-auto mt-2">
@@ -180,17 +175,72 @@ export default function Navbar({
                   </div>
                 ) : (
                   <div className="px-2 space-y-1.5">
-                    {notificationsList.map((notif, idx) => {
+                    {/* Render notifications for BOD (Live) */}
+                    {isBOD && liveNotifications.map((notif: any) => {
+                      const details = getNotifDetails(notif.type, notif.isRead);
+                      const IconComp = details.icon;
+                      return (
+                        <div
+                          key={notif.id}
+                          onClick={() => {
+                            if (!notif.isRead && onMarkNotificationRead) {
+                              onMarkNotificationRead(notif.id);
+                            }
+                            startTransition(() => {
+                              onNavigateToTab("dashboard");
+                            });
+                            setShowNotifDropdown(false);
+                          }}
+                          className={`p-3 rounded-2xl border flex items-start space-x-3 transition-all hover:bg-slate-50 cursor-pointer ${details.bg}`}
+                        >
+                          <div className={`p-1.5 rounded-xl bg-white shadow-xs shrink-0 ${details.text}`}>
+                            <IconComp className="w-4 h-4" />
+                          </div>
+                          <div className="text-left text-xs min-w-0 flex-1">
+                            <div className="font-bold text-slate-800 truncate flex justify-between items-center">
+                              <span className="truncate">{notif.title}</span>
+                              {!notif.isRead && (
+                                <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 shrink-0 ml-1"></span>
+                              )}
+                            </div>
+                            <p className="text-[10px] text-slate-500 mt-1 leading-normal line-clamp-2">{notif.message}</p>
+                            {notif.createdAt && (
+                              <span className="text-[8px] text-slate-400 font-mono mt-1 block">
+                                {new Date(notif.createdAt).toLocaleString("vi-VN", {
+                                  hour: "2-digit",
+                                  minute: "2-digit",
+                                  day: "2-digit",
+                                  month: "2-digit"
+                                })}
+                              </span>
+                            )}
+                          </div>
+                        </div>
+                      );
+                    })}
+
+                    {/* Render notifications for Super Admin (Mock) */}
+                    {isSuperAdmin && [
+                      {
+                        title: "Đăng ký doanh nghiệp thành công",
+                        desc: "Đối tác HAIPHONG đã được kích hoạt thành công trên phân vùng SaaS.",
+                        bg: "bg-emerald-50 border-emerald-100",
+                        text: "text-emerald-700",
+                        icon: CheckCircle2
+                      },
+                      {
+                        title: "Tài nguyên máy chủ ổn định",
+                        desc: "Uptime SLA đạt 99.99%, lưu lượng API gateway nằm trong ngưỡng an toàn.",
+                        bg: "bg-sky-50 border-sky-100",
+                        text: "text-sky-700",
+                        icon: ShieldAlert
+                      }
+                    ].map((notif, idx) => {
                       const IconComp = notif.icon;
                       return (
                         <div
                           key={idx}
                           onClick={() => {
-                            if (isBOD) {
-                              startTransition(() => {
-                                onNavigateToTab("dashboard");
-                              });
-                            }
                             setShowNotifDropdown(false);
                           }}
                           className={`p-3 rounded-2xl border flex items-start space-x-3 transition-all hover:bg-slate-50 cursor-pointer ${notif.bg}`}
@@ -218,7 +268,7 @@ export default function Navbar({
                       });
                       setShowNotifDropdown(false);
                     }}
-                    className="text-[10px] text-slate-teal font-bold hover:underline"
+                    className="text-[10px] text-slate-teal font-bold hover:underline bg-transparent border-0 cursor-pointer"
                   >
                     Xem chi tiết tại Hộp thư phê duyệt
                   </button>

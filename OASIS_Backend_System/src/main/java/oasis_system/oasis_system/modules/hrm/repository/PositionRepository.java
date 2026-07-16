@@ -22,4 +22,9 @@ public interface PositionRepository extends JpaRepository<Position, Long> {
      * Lấy danh sách chức vụ thuộc một doanh nghiệp cụ thể.
      */
     List<Position> findByCompanyId(Long companyId);
+
+    /**
+     * Kiểm tra xem tên chức vụ đã tồn tại trong doanh nghiệp chưa.
+     */
+    boolean existsByNameAndCompanyId(String name, Long companyId);
 }

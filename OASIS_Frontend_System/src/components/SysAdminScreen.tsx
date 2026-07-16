@@ -4,7 +4,8 @@ import { Shield, Plus, Building, User, Mail, Lock, CheckCircle2, AlertCircle, Tr
 import { registerCompanyApi, getCompaniesApi } from "../api";
 import { SAMPLE_TENANTS } from "../data";
 
-const getCompanyLogoUrl = (logoText: string) => {
+const getCompanyLogoUrl = (logoText?: string) => {
+  if (!logoText) return "https://images.unsplash.com/photo-1620121692029-d088224ddc74?w=80&auto=format&fit=crop&q=80"; // Fallback logo placeholder
   const code = logoText.toUpperCase();
   if (logoText.startsWith("http")) return logoText;
   if (code === "GV") {

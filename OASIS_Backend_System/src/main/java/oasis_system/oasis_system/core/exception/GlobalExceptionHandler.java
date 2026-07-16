@@ -66,6 +66,18 @@ public class GlobalExceptionHandler {
     }
 
     /**
+     * Xử lý lỗi xác thực / đăng nhập sai thông tin (Spring Security AuthenticationException)
+     */
+    @ExceptionHandler(org.springframework.security.core.AuthenticationException.class)
+    public ResponseEntity<ApiResponse<Void>> handleAuthenticationException(org.springframework.security.core.AuthenticationException ex) {
+        ApiResponse<Void> response = ApiResponse.error(
+                HttpStatus.UNAUTHORIZED.value(),
+                "Email đăng nhập hoặc mật khẩu không chính xác."
+        );
+        return new ResponseEntity<>(response, HttpStatus.UNAUTHORIZED);
+    }
+
+    /**
      * Xử lý toàn bộ các lỗi ngoại lệ chưa được khai báo khác (Fallback Exception Handler)
      */
     @ExceptionHandler(Exception.class)

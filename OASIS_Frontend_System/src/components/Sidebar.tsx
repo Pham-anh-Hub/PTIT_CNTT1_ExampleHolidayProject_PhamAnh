@@ -1,6 +1,7 @@
-import { useState, useTransition } from "react";
-import { LayoutDashboard, Users2, ShoppingCart, Hammer, Smartphone, ChevronLeft, ChevronRight, HelpCircle, Calculator, Shield } from "lucide-react";
+import { useState, useEffect, useTransition } from "react";
+import { LayoutDashboard, Users2, ShoppingCart, Hammer, Smartphone, ChevronLeft, ChevronRight, HelpCircle, Calculator, Shield, Settings, Layers } from "lucide-react";
 import { Tenant, User as UserType } from "../types";
+import { getTenantDepartmentsApi } from "../api";
 
 interface SidebarProps {
   activeTab: string;
@@ -10,7 +11,8 @@ interface SidebarProps {
   currentUser: UserType;
 }
 
-const getCompanyLogoUrl = (logoText: string) => {
+const getCompanyLogoUrl = (logoText?: string) => {
+  if (!logoText) return "https://images.unsplash.com/photo-1620121692029-d088224ddc74?w=80&auto=format&fit=crop&q=80"; // Fallback logo placeholder
   const code = logoText.toUpperCase();
   if (logoText.startsWith("http")) return logoText;
   if (code === "GV") {
@@ -25,6 +27,25 @@ const getCompanyLogoUrl = (logoText: string) => {
 export default function Sidebar({ activeTab, onTabChange, pendingApprovalsCount, currentTenant, currentUser }: SidebarProps) {
   const [isCollapsed, setIsCollapsed] = useState(false);
   const [, startTransition] = useTransition();
+  const [departments, setDepartments] = useState<Array<{ id: number; name: string }>>([]);
+
+  useEffect(() => {
+    const isUserAdminDN = currentUser && (
+      currentUser.role === "ADMIN_DN" || 
+      currentUser.role.toUpperCase().includes("QUẢN TRỊ DOANH NGHIỆP")
+    );
+    if (isUserAdminDN) {
+      getTenantDepartmentsApi()
+        .then((res) => {
+          if (res.data) {
+            setDepartments(res.data);
+          }
+        })
+        .catch((err) => {
+          console.error("Lỗi lấy danh mục phòng ban cho Sidebar:", err);
+        });
+    }
+  }, [currentUser]);
 
   const menuItems = [
     {
@@ -90,14 +111,14 @@ export default function Sidebar({ activeTab, onTabChange, pendingApprovalsCount,
       return item.id === "sys-admin";
     }
     
-    if (role === "BOD / OWNER" || role === "ADMIN_DN" || role === "DIRECTOR") {
+    if (role === "BOD / OWNER" || role === "ADMIN_DN" || role === "DIRECTOR" || role.includes("CHỦ DOANH NGHỆP") || role.includes("GIÁM ĐỐC") || role.includes("QUẢN TRỊ DOANH NGHIỆP")) {
       return item.id !== "sys-admin";
     }
     
-    if (role === "HR MANAGER" || role === "HR_STAFF") return item.id === "hrm";
-    if (role === "SALES STAFF" || role === "SALES_STAFF") return item.id === "sales";
-    if (role === "ACCOUNTANT" || role === "ACCOUNTANT_STAFF" || role === "AD") return item.id === "accountant";
-    if (role === "PRODUCTION WORKER" || role === "WORKER" || role === "PRODUCTION_STAFF") return item.id === "worker-portal" || item.id === "production";
+    if (role === "HR MANAGER" || role === "HR_STAFF" || role.includes("NHÂN SỰ") || role.includes("HR")) return item.id === "hrm";
+    if (role === "SALES STAFF" || role === "SALES_STAFF" || role.includes("KINH DOANH") || role.includes("SALES")) return item.id === "sales";
+    if (role === "ACCOUNTANT" || role === "ACCOUNTANT_STAFF" || role === "AD" || role.includes("KẾ TOÁN")) return item.id === "accountant";
+    if (role === "PRODUCTION WORKER" || role === "WORKER" || role === "PRODUCTION_STAFF" || role.includes("SẢN XUẤT") || role.includes("CÔNG NHÂN")) return item.id === "worker-portal" || item.id === "production";
     return false;
   });
 
@@ -139,60 +160,151 @@ export default function Sidebar({ activeTab, onTabChange, pendingApprovalsCount,
         {/* Main Navigation Menu */}
         <div className="px-2 space-y-1.5">
           <nav className="space-y-1.5">
-            {allowedMenuItems.map((item) => {
-              const IconComponent = item.icon;
-              const isActive = activeTab === item.id;
+            {role === "ADMIN_DN" || role.includes("QUẢN TRỊ DOANH NGHIỆP") ? (
+              <div className="space-y-4">
+                {/* Nhóm menu chính */}
+                <div className="space-y-1.5">
+                  {[
+                    { id: "tenant-admin-dashboard", name: "Tổng quan Dashboard", icon: LayoutDashboard },
+                    { id: "tenant-admin-accounts", name: "Nhân sự & Tài khoản", icon: Users2 },
+                    { id: "tenant-admin-settings", name: "Thiết lập doanh nghiệp", icon: Settings }
+                  ].map((item) => {
+                    const IconComponent = item.icon;
+                    const isActive = activeTab === item.id || (item.id === "tenant-admin-accounts" && activeTab.startsWith("tenant-admin-accounts-dept-"));
+                    return (
+                      <button
+                        key={item.id}
+                        onClick={() => {
+                          startTransition(() => {
+                            onTabChange(item.id);
+                          });
+                        }}
+                        className={`w-full group relative flex items-center justify-between p-2.5 rounded-2xl transition-all cursor-pointer ${
+                          isActive
+                            ? "bg-slate-teal-light shadow-xs"
+                            : "text-slate-600 hover:bg-slate-50 hover:text-slate-800"
+                        }`}
+                        id={`sidebar-tab-${item.id}`}
+                        title={item.name}
+                      >
+                        <div className="flex items-center space-x-3.5 min-w-0">
+                          <div className="p-1 transition-colors shrink-0 bg-transparent">
+                            <IconComponent className={`w-5 h-5 shrink-0 transition-colors ${isActive ? "text-slate-teal" : "text-slate-400 group-hover:text-slate-600"}`} />
+                          </div>
+                          {!isCollapsed && (
+                            <div className="text-left truncate">
+                              <span 
+                                className="tracking-tight block text-[13px]" 
+                                style={{ 
+                                  fontFamily: "'Poppins', sans-serif", 
+                                  fontWeight: isActive ? 600 : 500,
+                                  color: isActive ? "var(--color-slate-teal)" : "#475569" 
+                                }}
+                              >
+                                {item.name}
+                              </span>
+                            </div>
+                          )}
+                        </div>
+                      </button>
+                    );
+                  })}
+                </div>
 
-              return (
-                <button
-                  key={item.id}
-                  onClick={() => {
-                    startTransition(() => {
-                      onTabChange(item.id);
-                    });
-                  }}
-                  className={`w-full group relative flex items-center justify-between p-2.5 rounded-2xl transition-all cursor-pointer ${
-                    isActive
-                      ? "bg-slate-teal-light shadow-xs"
-                      : "text-slate-600 hover:bg-slate-50 hover:text-slate-800"
-                  }`}
-                  id={`sidebar-tab-${item.id}`}
-                  title={item.name}
-                >
-                  <div className="flex items-center space-x-3.5 min-w-0">
-                    <div className="p-1 transition-colors shrink-0 bg-transparent">
-                      <IconComponent className={`w-5 h-5 shrink-0 transition-colors ${isActive ? "text-slate-teal" : "text-slate-400 group-hover:text-slate-600"}`} />
+                {/* Nhóm phòng ban lọc nhanh */}
+                {!isCollapsed && departments.length > 0 && (
+                  <div className="pt-2 border-t border-slate-100">
+                    <div className="px-3 mb-2 text-[9px] text-slate-400 font-extrabold uppercase tracking-wider text-left animate-in fade-in" style={{ fontFamily: "'Poppins', sans-serif" }}>
+                      Lọc theo Phòng ban
                     </div>
-                    {!isCollapsed && (
-                      <div className="text-left truncate">
-                        <span 
-                          className="tracking-tight block text-[13.5px]" 
-                          style={{ 
-                            fontFamily: "'Poppins', sans-serif", 
-                            fontWeight: isActive ? 600 : 500,
-                            color: isActive ? "var(--color-slate-teal)" : "#475569" 
-                          }}
-                        >
-                          {item.name}
-                        </span>
-                      </div>
-                    )}
+                    <div className="space-y-1">
+                      {departments.map((dept) => {
+                        const targetTab = `tenant-admin-accounts-dept-${dept.id}`;
+                        const isActive = activeTab === targetTab;
+                        return (
+                          <button
+                            key={dept.id}
+                            onClick={() => {
+                              startTransition(() => {
+                                onTabChange(targetTab);
+                              });
+                            }}
+                            className={`w-full flex items-center space-x-3 px-3 py-1.5 rounded-xl transition-all cursor-pointer ${
+                              isActive 
+                                ? "bg-slate-50 text-blue-950 font-bold" 
+                                : "text-slate-500 hover:bg-slate-50 hover:text-slate-800"
+                            }`}
+                          >
+                            <Layers className={`w-3.5 h-3.5 shrink-0 ${isActive ? "text-blue-950" : "text-slate-400"}`} />
+                            <span 
+                              className="text-[11.5px] truncate text-left"
+                              style={{ fontFamily: "'Poppins', sans-serif" }}
+                            >
+                              {dept.name}
+                            </span>
+                          </button>
+                        );
+                      })}
+                    </div>
                   </div>
+                )}
+              </div>
+            ) : (
+              allowedMenuItems.map((item) => {
+                const IconComponent = item.icon;
+                const isActive = activeTab === item.id;
 
-                  {/* Badge Indicator */}
-                  {!isCollapsed && item.badge !== null && item.badge !== undefined && (
-                    <span className={`text-[9px] font-black min-w-[18px] h-[18px] px-1.5 flex items-center justify-center rounded-full shrink-0 shadow-sm ${item.badgeColor || ""}`}>
-                      {item.badge}
-                    </span>
-                  )}
+                return (
+                  <button
+                    key={item.id}
+                    onClick={() => {
+                      startTransition(() => {
+                        onTabChange(item.id);
+                      });
+                    }}
+                    className={`w-full group relative flex items-center justify-between p-2.5 rounded-2xl transition-all cursor-pointer ${
+                      isActive
+                        ? "bg-slate-teal-light shadow-xs"
+                        : "text-slate-600 hover:bg-slate-50 hover:text-slate-800"
+                    }`}
+                    id={`sidebar-tab-${item.id}`}
+                    title={item.name}
+                  >
+                    <div className="flex items-center space-x-3.5 min-w-0">
+                      <div className="p-1 transition-colors shrink-0 bg-transparent">
+                        <IconComponent className={`w-5 h-5 shrink-0 transition-colors ${isActive ? "text-slate-teal" : "text-slate-400 group-hover:text-slate-600"}`} />
+                      </div>
+                      {!isCollapsed && (
+                        <div className="text-left truncate">
+                          <span 
+                            className="tracking-tight block text-[13.5px]" 
+                            style={{ 
+                              fontFamily: "'Poppins', sans-serif", 
+                              fontWeight: isActive ? 600 : 500,
+                              color: isActive ? "var(--color-slate-teal)" : "#475569" 
+                            }}
+                          >
+                            {item.name}
+                          </span>
+                        </div>
+                      )}
+                    </div>
 
-                  {/* Floating Badge for Collapsed view */}
-                  {isCollapsed && item.badge !== null && item.badge !== undefined && (
-                    <span className="absolute top-1 right-1 w-2 h-2 rounded-full bg-terracotta border border-white"></span>
-                  )}
-                </button>
-              );
-            })}
+                    {/* Badge Indicator */}
+                    {!isCollapsed && item.badge !== null && item.badge !== undefined && (
+                      <span className={`text-[9px] font-black min-w-[18px] h-[18px] px-1.5 flex items-center justify-center rounded-full shrink-0 shadow-sm ${item.badgeColor || ""}`}>
+                        {item.badge}
+                      </span>
+                    )}
+
+                    {/* Floating Badge for Collapsed view */}
+                    {isCollapsed && item.badge !== null && item.badge !== undefined && (
+                      <span className="absolute top-1 right-1 w-2 h-2 rounded-full bg-terracotta border border-white"></span>
+                    )}
+                  </button>
+                );
+              })
+            )}
           </nav>
         </div>
       </div>

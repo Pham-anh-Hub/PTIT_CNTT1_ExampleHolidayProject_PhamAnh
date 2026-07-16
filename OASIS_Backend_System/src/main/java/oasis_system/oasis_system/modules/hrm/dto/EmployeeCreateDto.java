@@ -26,6 +26,8 @@ public class EmployeeCreateDto {
 
     private String phone;
 
+    private String avatarUrl;
+
     private String employeeCode; // Nếu trống, hệ thống sẽ tự động sinh theo mẫu: CTY-DEPT-XXXX
 
     @NotNull(message = "ID phòng ban không được để trống")

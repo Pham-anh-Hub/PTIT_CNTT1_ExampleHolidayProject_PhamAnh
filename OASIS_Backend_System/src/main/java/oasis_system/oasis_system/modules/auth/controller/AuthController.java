@@ -1,5 +1,6 @@
 package oasis_system.oasis_system.modules.auth.controller;
 
+import jakarta.servlet.http.HttpServletRequest;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import oasis_system.oasis_system.core.exception.ApiResponse;
@@ -57,7 +58,7 @@ public class AuthController {
      * @return Phản hồi trống báo đăng xuất thành công
      */
     @PostMapping("/logout")
-    public ResponseEntity<ApiResponse<Void>> logout(jakarta.servlet.http.HttpServletRequest request) {
+    public ResponseEntity<ApiResponse<Void>> logout(HttpServletRequest request) {
         authService.logout(request);
         return ResponseEntity.ok(ApiResponse.success("Đăng xuất thành công.", null));
     }

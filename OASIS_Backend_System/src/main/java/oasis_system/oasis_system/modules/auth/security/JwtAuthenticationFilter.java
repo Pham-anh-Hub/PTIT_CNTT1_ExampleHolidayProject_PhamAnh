@@ -65,8 +65,14 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
         }
         
         try {
-            // 2. Giải mã token trích xuất email người dùng (Username)
-            userEmail = jwtService.extractUsername(jwt);
+            try {
+                // 2. Giải mã token trích xuất email người dùng (Username)
+                userEmail = jwtService.extractUsername(jwt);
+            } catch (io.jsonwebtoken.ExpiredJwtException | io.jsonwebtoken.security.SignatureException | io.jsonwebtoken.MalformedJwtException e) {
+                // Token lỗi/hết hạn -> Cho qua filter để xử lý như request nặc danh (Spring Security sẽ chặn 401 ở phân quyền sau đó)
+                filterChain.doFilter(request, response);
+                return;
+            }
 
             // 3. Nếu trích xuất được email và tài khoản chưa được xác thực trong phiên làm việc này
             if (userEmail != null && SecurityContextHolder.getContext().getAuthentication() == null) {

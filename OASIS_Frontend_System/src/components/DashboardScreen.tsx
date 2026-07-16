@@ -1,6 +1,13 @@
-import { useState, useTransition } from "react";
+import { useState, useEffect, useTransition } from "react";
 import { SalesOrder, Contract, LeaveRequest, MaterialImport, SupplierPayable } from "../types";
-import { TrendingUp, AlertCircle, Check, X, FileText, CalendarRange, UserPlus, FileCheck2, ArrowRight } from "lucide-react";
+import { TrendingUp, AlertCircle, Check, X, FileText, CalendarRange, UserPlus, FileCheck2, ArrowRight, DollarSign, Wallet, RefreshCw, Landmark } from "lucide-react";
+import {
+  getBodKpiCardsApi,
+  getBodRevenueTrendApi,
+  getBodCostStructureApi,
+  getBodCustomerDebtApi,
+  simulateBodNotificationApi
+} from "../api";
 
 interface DashboardScreenProps {
   orders: SalesOrder[];
@@ -40,97 +47,109 @@ export default function DashboardScreen({
   const [rejectionReason, setRejectionReason] = useState("");
   const [showRejectForm, setShowRejectForm] = useState(false);
 
-  // Dynamic Chart States
-  const [chartFilter, setChartFilter] = useState<"all" | "product" | "material">("all");
-  const [hoveredBar, setHoveredBar] = useState<{
-    monthIndex: number;
-    monthLabel: string;
-    type: "sp" | "nvl" | "sales";
-    value: number;
+  // Dynamic States for API data
+  const [kpiData, setKpiData] = useState<{
+    totalRevenue: number;
+    actualRevenue: number;
+    totalProductionCost: number;
+    netProfit: number;
+    totalDebt: number;
+  }>({
+    totalRevenue: 0,
+    actualRevenue: 0,
+    totalProductionCost: 0,
+    netProfit: 0,
+    totalDebt: 0
+  });
+
+  const [revenueTrend, setRevenueTrend] = useState<any[]>([]);
+  const [costStructure, setCostStructure] = useState<any[]>([]);
+  const [customerDebt, setCustomerDebt] = useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+
+  // Simulation form states
+  const [simTitle, setSimTitle] = useState("Đề xuất đơn hàng mới chờ duyệt");
+  const [simMessage, setSimMessage] = useState("Đơn hàng DH-2026-008 vượt ngưỡng trị giá 75,000,000 VND cần Giám đốc ký duyệt số.");
+  const [simType, setSimType] = useState("ORDER");
+  const [isSimulating, setIsSimulating] = useState(false);
+  const [simSuccess, setSimSuccess] = useState<string | null>(null);
+
+  // Hover tooltip state for Combo Chart
+  const [hoveredTrendBar, setHoveredTrendBar] = useState<{
     x: number;
     y: number;
+    monthLabel: string;
+    revenue: number;
+    sales: number;
+    profit: number;
   } | null>(null);
 
-  // 1. Calculate dynamic financial metrics based on real-time list state
-  const approvedOrders = orders.filter((o) => o.status === "APPROVED");
+  const fetchDashboardData = async () => {
+    try {
+      setLoading(true);
+      setError(null);
+      const [kpiRes, trendRes, costRes, debtRes] = await Promise.all([
+        getBodKpiCardsApi(),
+        getBodRevenueTrendApi(),
+        getBodCostStructureApi(),
+        getBodCustomerDebtApi()
+      ]);
+
+      setKpiData(kpiRes.data || {
+        totalRevenue: 0,
+        actualRevenue: 0,
+        totalProductionCost: 0,
+        netProfit: 0,
+        totalDebt: 0
+      });
+      setRevenueTrend(trendRes.data || []);
+      setCostStructure(costRes.data || []);
+      setCustomerDebt(debtRes.data || []);
+    } catch (err: any) {
+      console.error("Lỗi lấy dữ liệu thống kê Dashboard:", err);
+      setError("Không thể nạp dữ liệu thống kê từ máy chủ Backend. Vui lòng kiểm tra lại kết nối.");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    fetchDashboardData();
+  }, []);
+
+  const handleSimulateSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!simTitle.trim() || !simMessage.trim()) return;
+    try {
+      setIsSimulating(true);
+      setSimSuccess(null);
+      await simulateBodNotificationApi({
+        title: simTitle.trim(),
+        message: simMessage.trim(),
+        type: simType,
+        referenceId: Math.floor(Math.random() * 1000)
+      });
+      setSimSuccess("Đã phát yêu cầu phê duyệt giả lập qua WebSocket thành công!");
+      setTimeout(() => setSimSuccess(null), 3000);
+    } catch (err: any) {
+      alert(err.message || "Gửi giả lập thất bại.");
+    } finally {
+      setIsSimulating(false);
+    }
+  };
+
+  // Helper selector for pending approvals count
   const pendingOrders = orders.filter((o) => o.status === "PENDING");
   const pendingContracts = contracts.filter((c) => c.status === "PENDING");
   const pendingLeaves = leaves.filter((l) => l.status === "PENDING");
 
-  const totalRevenue = approvedOrders.reduce((sum, o) => sum + o.totalAmount, 0);
-  const totalPendingCount = pendingOrders.length + pendingContracts.length + pendingLeaves.length;
-
-  // Real-time tax-aware corporate finance calculations
-  const netSalesRevenue = totalRevenue - Math.round(totalRevenue * 0.1); // 10% Output VAT deduction
-  const materialCostSum = materialImports.reduce((sum, imp) => sum + imp.totalAmount, 0);
-  const totalEmployeeSalariesSum = contracts.filter(c => c.status === "APPROVED").reduce((sum, c) => sum + c.basicSalary, 0) + 7700000;
-  const otherOverheadCosts = 15000000;
-  const totalCorporateExpenses = materialCostSum + totalEmployeeSalariesSum + otherOverheadCosts;
-  const profitBeforeTax = netSalesRevenue - totalCorporateExpenses;
-  const taxCITAmount = profitBeforeTax > 0 ? Math.round(profitBeforeTax * (corporateTaxRate / 100)) : 0;
-  const netProfitAfterTax = profitBeforeTax - taxCITAmount;
-
-  const liveRevenueM = Math.round(totalRevenue / 1000000) || 115;
-  const liveDSHeight = Math.min(160, liveRevenueM * 0.85);
-  const liveDSY = 190 - liveDSHeight;
-
-  // Monthly data matching the exact values
-  const monthsData = [
-    { label: "Tháng 2", sp: 100, nvl: 60, sales: 110 },
-    { label: "Tháng 3", sp: 130, nvl: 80, sales: 120 },
-    { label: "Tháng 4", sp: 115, nvl: 70, sales: 135 },
-    { label: "Tháng 5", sp: 145, nvl: 90, sales: 125 },
-    { label: "Tháng 6", sp: 160, nvl: 110, sales: 140 },
-    { label: "Tháng 7", sp: 155, nvl: 105, sales: liveRevenueM }
-  ];
-
-  // Helper to compute exact X coordinates of bars based on filters
-  const getBarX = (monthIndex: number, barType: "sp" | "nvl" | "sales") => {
-    const centerX = 83 + monthIndex * 80;
-    if (chartFilter === "all") {
-      if (barType === "sp") return centerX - 33;
-      if (barType === "nvl") return centerX - 11;
-      return centerX + 11;
-    } else if (chartFilter === "product") {
-      if (barType === "sp") return centerX - 32;
-      if (barType === "sales") return centerX;
-      return -999; // Offscreen/hidden
-    } else { // "material"
-      if (barType === "nvl") return centerX - 32;
-      if (barType === "sales") return centerX;
-      return -999; // Offscreen/hidden
-    }
-  };
-
-  // Helper to construct trendline coordinates
-  const getTrendPathData = (type: "sp" | "nvl" | "sales") => {
-    const barWidth = chartFilter === "all" ? 22 : 32;
-    const points = monthsData.map((d, idx) => {
-      const val = type === "sp" ? d.sp : type === "nvl" ? d.nvl : d.sales;
-      const x = getBarX(idx, type) + barWidth / 2; // Center of the wider bar
-      const y = 190 - (val / 200) * 170;
-      return { x, y, val };
-    });
-    const pathD = points.map((p, idx) => (idx === 0 ? `M ${p.x} ${p.y}` : `L ${p.x} ${p.y}`)).join(" ");
-    const areaD = `${pathD} L ${points[points.length - 1].x} 190 L ${points[0].x} 190 Z`;
-    return { pathD, areaD, points };
-  };
-
   // Formatting utility for money
   const formatMoney = (amount: number) => {
-    return new Intl.NumberFormat("vi-VN", { style: "currency", currency: "VND" }).format(amount);
+    return new Intl.NumberFormat("vi-VN", { style: "currency", currency: "VND" }).format(amount || 0);
   };
 
-  // Simulated static/overdue customer debts (Top 5 as specified in 4.6a)
-  const overdueDebts = [
-    { client: "Nội Thất Nhà Xinh", debt: 120000000, days: 45, status: "DANGER" },
-    { client: "Xây dựng Hoà Bình", debt: 95000000, days: 32, status: "DANGER" },
-    { client: "Tập đoàn SunGroup", debt: 82000000, days: 14, status: "WARNING" },
-    { client: "Gỗ Mỹ Nghệ Âu Lạc", debt: 45000000, days: 5, status: "WARNING" },
-    { client: "Showroom Tân Cổ Điển", debt: 25000000, days: 0, status: "GOOD" }
-  ];
-
-  // Quick Approval queue list
+  // Build approval queue list
   const approvalQueue: { id: string; title: string; subtitle: string; amount?: number; type: "ORDER" | "CONTRACT" | "LEAVE"; data: any; date: string }[] = [];
 
   pendingOrders.forEach((o) => {
@@ -190,489 +209,648 @@ export default function DashboardScreen({
     });
   };
 
+  // Formatter for Period label
+  const formatPeriodLabel = (p: string) => {
+    if (!p) return "";
+    const parts = p.split("-");
+    if (parts.length === 2) {
+      return `Tháng ${parts[1]}`;
+    }
+    return p;
+  };
+
+  if (loading) {
+    return (
+      <div className="min-h-[400px] flex flex-col items-center justify-center space-y-3" id="bod-dashboard-loading">
+        <RefreshCw className="w-10 h-10 text-slate-teal animate-spin" />
+        <p className="text-xs text-slate-400 font-bold">Đang đồng bộ số liệu tài chính thời gian thực...</p>
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="bg-rose-50 border border-rose-100 rounded-3xl p-6 text-center space-y-4" id="bod-dashboard-error">
+        <AlertCircle className="w-12 h-12 text-rose-500 mx-auto" />
+        <h3 className="text-sm font-black text-rose-800">Lỗi nạp dữ liệu thống kê</h3>
+        <p className="text-xs text-rose-600 max-w-md mx-auto">{error}</p>
+        <button
+          onClick={fetchDashboardData}
+          className="px-4 py-2 bg-rose-600 hover:bg-rose-700 text-white rounded-xl text-xs font-bold transition-all cursor-pointer"
+        >
+          Thử kết nối lại
+        </button>
+      </div>
+    );
+  }
+
+  // Margin Rate calculation
+  const marginRate = kpiData.totalRevenue > 0
+    ? ((kpiData.netProfit / kpiData.totalRevenue) * 100).toFixed(1)
+    : "0.0";
+
+  // Real-time or Fallback static dataset to ensure smooth dashboard charts
+  const finalTrend = revenueTrend.length > 0 ? revenueTrend : [
+    { period: "2026-02", revenue: 80000000, sales: 110000000, profit: 20000000 },
+    { period: "2026-03", revenue: 100000000, sales: 120000000, profit: 25000000 },
+    { period: "2026-04", revenue: 95000000, sales: 135000000, profit: 22000000 },
+    { period: "2026-05", revenue: 110000000, sales: 125000000, profit: 30000000 },
+    { period: "2026-06", revenue: 120000000, sales: 140000000, profit: 35000000 },
+    { period: "2026-07", revenue: kpiData.actualRevenue || 115000000, sales: kpiData.totalRevenue || 155000000, profit: kpiData.netProfit || 40000000 }
+  ];
+
+  const finalCostStructure = costStructure.length > 0 ? costStructure : [
+    { costName: "Chi phí vật tư", amount: kpiData.totalProductionCost || 70000000, percentage: 55 },
+    { costName: "Lương nhân công", amount: 45000000, percentage: 35 },
+    { costName: "Thuế & Khác", amount: 15000000, percentage: 10 }
+  ];
+
+  const finalCustomerDebt = customerDebt.length > 0 ? customerDebt : [
+    { customerName: "Nội Thất Nhà Xinh", debtAmount: 120000000 },
+    { customerName: "Xây dựng Hoà Bình", debtAmount: 95000000 },
+    { customerName: "Tập đoàn SunGroup", debtAmount: 82000000 },
+    { customerName: "Gỗ Mỹ Nghệ Âu Lạc", debtAmount: 45000000 },
+    { customerName: "Showroom Tân Cổ Điển", debtAmount: 25000000 }
+  ];
+
+  const totalCostVal = finalCostStructure.reduce((sum, c) => sum + c.amount, 0);
+
   return (
     <div className="space-y-6 animate-in fade-in duration-300" id="bod-dashboard-view">
       {/* View Header with subtle intro */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
           <h1 className="text-xl font-bold font-display text-slate-800 tracking-tight flex items-center">
-            Trung Tâm Điều Hành &amp; Phê Duyệt Executive
+            Trung Tâm Điều Hành &amp; Báo Cáo Tài Chính Executive
           </h1>
           <p className="text-xs text-slate-400 mt-1">
-            Góc nhìn tổng hợp của Ban Giám đốc (BOD) giúp theo dõi doanh thu thực tế, kiểm soát nợ quá hạn và ra quyết định phê duyệt.
+            Góc nhìn tổng hợp tài chính thời gian thực và quản lý hàng đợi ký duyệt dành cho Ban Giám đốc (BOD).
           </p>
         </div>
-        <div className="text-xs bg-white border border-slate-100 rounded-lg px-3 py-1.5 shadow-sm text-slate-500 font-medium">
-          Dòng thời gian: <span className="text-slate-800 font-bold">Tháng 07, 2026</span>
+        <div className="flex items-center space-x-2">
+          <button
+            onClick={fetchDashboardData}
+            className="p-2 bg-white hover:bg-slate-50 border border-slate-200 rounded-xl text-slate-600 transition-all cursor-pointer"
+            title="Đồng bộ lại dữ liệu"
+          >
+            <RefreshCw className="w-4 h-4" />
+          </button>
+          <div className="text-xs bg-white border border-slate-100 rounded-xl px-3 py-1.5 shadow-sm text-slate-500 font-medium">
+            Thời gian: <span className="text-slate-800 font-bold">Tháng 07, 2026</span>
+          </div>
         </div>
       </div>
 
-      {/* KPI 4-Column Grid */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4" id="kpi-dashboard-grid">
-        {/* Card 1: Month-to-date Revenue */}
+      {/* KPI 5-Column Grid */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4" id="kpi-dashboard-grid">
+        {/* Card 1: Doanh thu danh nghĩa */}
         <div className="bg-white border border-slate-100 p-5 rounded-2xl shadow-sm hover:shadow-md transition-all duration-200">
           <div className="flex justify-between items-start">
-            <span className="text-xs font-semibold text-slate-400">Doanh thu Thực nhận YTD</span>
+            <span className="text-xs font-semibold text-slate-400">Doanh thu Danh nghĩa</span>
+            <span className="p-1.5 rounded-xl bg-slate-50 text-slate-600">
+              <DollarSign className="w-4 h-4" />
+            </span>
+          </div>
+          <div className="mt-3">
+            <h3 className="text-lg font-black text-slate-800 tracking-tight font-mono">
+              {formatMoney(kpiData.totalRevenue)}
+            </h3>
+            <span className="text-[10px] text-slate-400 block mt-1">Trị giá đơn hàng đã ký duyệt</span>
+          </div>
+        </div>
+
+        {/* Card 2: Doanh thu Thực thu */}
+        <div className="bg-white border border-slate-100 p-5 rounded-2xl shadow-sm hover:shadow-md transition-all duration-200">
+          <div className="flex justify-between items-start">
+            <span className="text-xs font-semibold text-slate-400">Thực thu nhận về</span>
             <span className="px-2 py-0.5 rounded-full bg-emerald-green-light text-emerald-green text-[10px] font-bold flex items-center space-x-1">
               <TrendingUp className="w-3 h-3" />
-              <span>+12.4%</span>
+              <span>Thực tế</span>
             </span>
           </div>
           <div className="mt-3">
-            <span className="text-xl font-bold text-slate-teal font-sans tracking-tight block">
-              {formatMoney(totalRevenue)}
-            </span>
-            <span className="text-[10px] text-slate-400 mt-1.5 block font-mono">
-              Chỉ tính các đơn đã duyệt chính thức
-            </span>
+            <h3 className="text-lg font-black text-slate-800 tracking-tight font-mono">
+              {formatMoney(kpiData.actualRevenue)}
+            </h3>
+            <span className="text-[10px] text-slate-400 block mt-1">Dòng tiền thực thu từ khách</span>
           </div>
         </div>
 
-        {/* Card 2: Overdue Receivables */}
+        {/* Card 3: Chi chi phí vận hành */}
         <div className="bg-white border border-slate-100 p-5 rounded-2xl shadow-sm hover:shadow-md transition-all duration-200">
           <div className="flex justify-between items-start">
-            <span className="text-xs font-semibold text-slate-400">Công nợ quá hạn báo đỏ</span>
-            <span className="px-2 py-0.5 rounded-full bg-terracotta-light text-terracotta text-[10px] font-bold">
-              Cảnh báo
+            <span className="text-xs font-semibold text-slate-400">Tổng Chi phí Vận hành</span>
+            <span className="p-1.5 rounded-xl bg-rose-50 text-rose-600">
+              <Wallet className="w-4 h-4" />
             </span>
           </div>
           <div className="mt-3">
-            <span className="text-xl font-bold text-terracotta tracking-tight block">
-              {formatMoney(342000000)}
-            </span>
-            <span className="text-[10px] text-slate-500 mt-1.5 block font-sans">
-              Có <strong className="text-terracotta font-bold">8 đối tác</strong> quá hạn thanh toán &gt; 30 ngày
-            </span>
+            <h3 className="text-lg font-black text-slate-800 tracking-tight font-mono">
+              {formatMoney(kpiData.totalProductionCost)}
+            </h3>
+            <span className="text-[10px] text-slate-400 block mt-1">Ngân sách vật tư, nhân công</span>
           </div>
         </div>
 
-        {/* Card 3: Net Profit After Tax */}
+        {/* Card 4: Lợi nhuận ròng */}
         <div className="bg-white border border-slate-100 p-5 rounded-2xl shadow-sm hover:shadow-md transition-all duration-200">
           <div className="flex justify-between items-start">
-            <span className="text-xs font-semibold text-slate-400 font-sans">Lợi Nhuận Ròng (Sau Thuế CIT)</span>
-            <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold ${netProfitAfterTax > 0 ? "bg-emerald-50 text-emerald-600" : "bg-rose-50 text-rose-600"}`}>
-              CIT: {corporateTaxRate}%
+            <span className="text-xs font-semibold text-slate-400">Lợi nhuận ròng</span>
+            <span className="px-2 py-0.5 rounded-full bg-slate-teal-light text-slate-teal text-[9px] font-bold">
+              Biên lãi: {marginRate}%
             </span>
           </div>
           <div className="mt-3">
-            <span className={`text-xl font-bold tracking-tight block ${netProfitAfterTax > 0 ? "text-emerald-600" : "text-rose-600"}`}>
-              {formatMoney(netProfitAfterTax)}
-            </span>
-            <span className="text-[10px] text-slate-400 mt-1.5 block font-sans">
-              Đã trừ Thuế TNDN và chi phí vận hành
-            </span>
+            <h3 className="text-lg font-black text-slate-teal tracking-tight font-mono">
+              {formatMoney(kpiData.netProfit)}
+            </h3>
+            <span className="text-[10px] text-slate-400 block mt-1">Doanh thu trừ hết mọi chi phí</span>
           </div>
         </div>
 
-        {/* Card 4: Pending Approvals count */}
-        <div className={`border p-5 rounded-2xl shadow-sm transition-all duration-200 ${
-          totalPendingCount > 0 ? "bg-amber-50/50 border-amber-100 pulse-ring" : "bg-white border-slate-100"
-        }`}>
+        {/* Card 5: Tổng nợ khách hàng */}
+        <div className="bg-white border border-slate-100 p-5 rounded-2xl shadow-sm hover:shadow-md transition-all duration-200">
           <div className="flex justify-between items-start">
-            <span className="text-xs font-semibold text-slate-500">Đề xuất chờ phê duyệt</span>
-            {totalPendingCount > 0 ? (
-              <span className="px-2 py-0.5 rounded-full bg-amber-100 text-amber-800 text-[10px] font-extrabold animate-pulse">
-                CẦN XỬ LÝ
-              </span>
-            ) : (
-              <span className="px-2 py-0.5 rounded-full bg-slate-100 text-slate-400 text-[10px] font-bold">
-                Trống
-              </span>
-            )}
+            <span className="text-xs font-semibold text-slate-400">Công nợ khách hàng</span>
+            <span className="p-1.5 rounded-xl bg-amber-50 text-amber-600">
+              <Landmark className="w-4 h-4" />
+            </span>
           </div>
           <div className="mt-3">
-            <span className="text-xl font-bold text-slate-800 tracking-tight block">
-              {totalPendingCount} yêu cầu
-            </span>
-            <span className="text-[10px] text-slate-500 mt-1.5 block font-sans">
-              {pendingOrders.length} Đơn hàng | {pendingContracts.length} HĐLD | {pendingLeaves.length} Nghỉ phép
-            </span>
+            <h3 className="text-lg font-black text-amber-700 tracking-tight font-mono">
+              {formatMoney(kpiData.totalDebt)}
+            </h3>
+            <span className="text-[10px] text-slate-400 block mt-1">Chưa thu hồi (sales - thực thu)</span>
           </div>
         </div>
       </div>
 
-      {/* Main Column Grid: Chart vs Debts */}
-      <div className="grid grid-cols-1 lg:grid-cols-12 gap-6" id="dashboard-charts-layout">
-        {/* Left Chart (Triple Bar Chart comparing Products, Materials and Sales) - 7 columns */}
-        <div className="lg:col-span-7 bg-white border border-slate-100 p-5 rounded-2xl shadow-sm flex flex-col justify-between relative group/chart">
-          <div>
-            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-              <div>
-                <h3 className="text-sm font-bold text-slate-800">Biểu đồ đối chiếu Vận hành - Bán hàng</h3>
-                <p className="text-[11px] text-slate-400 mt-1">So sánh tổng hợp khối lượng nhập kho (Thành phẩm &amp; Nguyên vật liệu) đối chiếu với doanh số xuất hàng thực tế.</p>
-              </div>
-
-              {/* Toggle controls to filter between All, Product and Raw Material */}
-              <div className="flex bg-slate-100 p-0.5 rounded-lg text-[10px] font-semibold text-slate-500 self-start sm:self-center">
-                <button
-                  onClick={() => setChartFilter("all")}
-                  className={`px-2.5 py-1 rounded-md transition-all cursor-pointer ${chartFilter === "all" ? "bg-white text-slate-teal shadow-xs font-bold" : "hover:text-slate-800"}`}
-                >
-                  Tất cả
-                </button>
-                <button
-                  onClick={() => setChartFilter("product")}
-                  className={`px-2.5 py-1 rounded-md transition-all cursor-pointer ${chartFilter === "product" ? "bg-white text-slate-teal shadow-xs font-bold" : "hover:text-slate-800"}`}
-                >
-                  Thành phẩm (SP)
-                </button>
-                <button
-                  onClick={() => setChartFilter("material")}
-                  className={`px-2.5 py-1 rounded-md transition-all cursor-pointer ${chartFilter === "material" ? "bg-white text-slate-teal shadow-xs font-bold" : "hover:text-slate-800"}`}
-                >
-                  Vật tư (NVL)
-                </button>
-              </div>
+      {/* Row 1 Charts: Combo Chart & Cost Structure */}
+      <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
+        {/* Combo Chart */}
+        <div className="bg-white border border-slate-100 rounded-3xl p-6 shadow-sm lg:col-span-8 relative">
+          <div className="flex justify-between items-center mb-4">
+            <div>
+              <h3 className="text-sm font-bold text-slate-800">Xu hướng Doanh thu &amp; Lợi nhuận ròng</h3>
+              <p className="text-[10px] text-slate-400 mt-0.5">Bar (Cột chồng): Doanh thu thực tế (dưới) &amp; Công nợ (trên). Line (Đường): Lợi nhuận.</p>
             </div>
-
-            {/* Legends */}
-            <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-[10px] mt-3 pt-2.5 border-t border-dashed border-slate-100">
-              {(chartFilter === "all" || chartFilter === "product") && (
-                <div className="flex items-center space-x-1 cursor-help" title="Nhấp hoặc di chuột vào các cột để xem biểu đồ đường xu hướng">
-                  <span className="w-2.5 h-2.5 rounded-sm" style={{ backgroundColor: "hsl(215, 85%, 46%)" }}></span>
-                  <span className="text-slate-500 font-medium">Nhập kho Thành phẩm (SP)</span>
-                </div>
-              )}
-              {(chartFilter === "all" || chartFilter === "material") && (
-                <div className="flex items-center space-x-1 cursor-help" title="Nhấp hoặc di chuột vào các cột để xem biểu đồ đường xu hướng">
-                  <span className="w-2.5 h-2.5 rounded-sm" style={{ backgroundColor: "hsl(220, 60%, 18%)" }}></span>
-                  <span className="text-slate-500 font-medium">Nhập kho Vật tư (NVL)</span>
-                </div>
-              )}
-              <div className="flex items-center space-x-1 cursor-help" title="Nhấp hoặc di chuột vào các cột để xem biểu đồ đường xu hướng">
-                <span className="w-2.5 h-2.5 rounded-sm" style={{ backgroundColor: "hsl(215, 16%, 55%)" }}></span>
-                <span className="text-slate-500 font-medium">Doanh số xuất xưởng (Sales)</span>
+            {/* Chart Legend */}
+            <div className="flex items-center space-x-3 text-[10px] font-bold">
+              <div className="flex items-center space-x-1">
+                <span className="w-2.5 h-2.5 rounded bg-blue-950"></span>
+                <span className="text-slate-500">Thực thu</span>
               </div>
-              <span className="text-[9px] text-slate-400 italic ml-auto hidden sm:inline">💡 Rê chuột vào cột để hiển thị biểu đồ đường xu hướng</span>
+              <div className="flex items-center space-x-1">
+                <span className="w-2.5 h-2.5 rounded bg-slate-300"></span>
+                <span className="text-slate-500">Nợ quá hạn</span>
+              </div>
+              <div className="flex items-center space-x-1">
+                <span className="w-3 h-0.5 bg-emerald-500 inline-block relative top-[-1px]"></span>
+                <span className="text-slate-500">Lợi nhuận</span>
+              </div>
             </div>
           </div>
 
-          {/* Clean, interactive, fully-responsive Custom SVG Chart */}
-          <div className="my-6 h-56 w-full flex items-end relative">
-            <svg viewBox="0 0 600 220" className="w-full h-full font-mono text-[8px] fill-slate-400 overflow-visible">
+          {/* SVG Combo Chart */}
+          <div className="h-64 relative">
+            <svg className="w-full h-full" viewBox="0 0 600 220">
               {/* Grid Lines */}
-              <line x1="30" y1="20" x2="570" y2="20" stroke="#f1f5f9" strokeWidth="1" />
-              <line x1="30" y1="65" x2="570" y2="65" stroke="#f1f5f9" strokeWidth="1" />
-              <line x1="30" y1="110" x2="570" y2="110" stroke="#f1f5f9" strokeWidth="1" />
-              <line x1="30" y1="155" x2="570" y2="155" stroke="#f1f5f9" strokeWidth="1" />
-              <line x1="30" y1="190" x2="570" y2="190" stroke="#cbd5e1" strokeWidth="1" strokeDasharray="3,3" />
+              <line x1="45" y1="20" x2="560" y2="20" stroke="#f1f5f9" strokeWidth="1" />
+              <line x1="45" y1="62.5" x2="560" y2="62.5" stroke="#f1f5f9" strokeWidth="1" />
+              <line x1="45" y1="105" x2="560" y2="105" stroke="#f1f5f9" strokeWidth="1" />
+              <line x1="45" y1="147.5" x2="560" y2="147.5" stroke="#f1f5f9" strokeWidth="1" />
+              <line x1="45" y1="190" x2="560" y2="190" stroke="#cbd5e1" strokeWidth="1" />
 
-              {/* Y Axis Labels */}
-              <text x="5" y="24" textAnchor="start">200M</text>
-              <text x="5" y="69" textAnchor="start">150M</text>
-              <text x="5" y="114" textAnchor="start">100M</text>
-              <text x="5" y="159" textAnchor="start">50M</text>
-              <text x="5" y="194" textAnchor="start">VND</text>
+              {/* Y Axis scale indicators */}
+              <text x="35" y="24" textAnchor="end" className="text-[9px] font-bold font-mono fill-slate-400">160M</text>
+              <text x="35" y="66.5" textAnchor="end" className="text-[9px] font-bold font-mono fill-slate-400">120M</text>
+              <text x="35" y="109" textAnchor="end" className="text-[9px] font-bold font-mono fill-slate-400">80M</text>
+              <text x="35" y="151.5" textAnchor="end" className="text-[9px] font-bold font-mono fill-slate-400">40M</text>
+              <text x="35" y="194" textAnchor="end" className="text-[9px] font-bold font-mono fill-slate-400">0M</text>
 
-              {/* Render Bars for each of the 6 months */}
-              {monthsData.map((data, monthIdx) => {
-                const isMonthHovered = hoveredBar?.monthIndex === monthIdx;
+              {/* Draw bars */}
+              {(() => {
+                const maxVal = Math.max(...finalTrend.map(d => Math.max(d.sales || 0, d.revenue || 0, Math.abs(d.profit || 0))), 160000000) || 160000000;
+                
+                return finalTrend.map((d, idx) => {
+                  const colX = 65 + idx * 80;
+                  const revHeight = ((d.revenue || 0) / maxVal) * 170;
+                  const revY = 190 - revHeight;
 
-                // Render metrics based on filter
-                const showSP = chartFilter === "all" || chartFilter === "product";
-                const showNVL = chartFilter === "all" || chartFilter === "material";
-                const showSales = true;
+                  const debtVal = Math.max(0, (d.sales || 0) - (d.revenue || 0));
+                  const debtHeight = (debtVal / maxVal) * 170;
+                  const debtY = revY - debtHeight;
 
-                // Determine widths dynamically (increased as requested)
-                const barWidth = chartFilter === "all" ? 22 : 32;
-                const hoveredBarWidth = chartFilter === "all" ? 30 : 40;
-                const hoverOffset = (hoveredBarWidth - barWidth) / 2; // e.g. (24-18)/2 = 3
-
-                // Calculate positions
-                const spX = getBarX(monthIdx, "sp");
-                const nvlX = getBarX(monthIdx, "nvl");
-                const salesX = getBarX(monthIdx, "sales");
-
-                const spY = 190 - (data.sp / 200) * 170;
-                const spHeight = (data.sp / 200) * 170;
-
-                const nvlY = 190 - (data.nvl / 200) * 170;
-                const nvlHeight = (data.nvl / 200) * 170;
-
-                const salesY = 190 - (data.sales / 200) * 170;
-                const salesHeight = (data.sales / 200) * 170;
-
-                // Check active state
-                const isSpHovered = hoveredBar?.monthIndex === monthIdx && hoveredBar?.type === "sp";
-                const isNvlHovered = hoveredBar?.monthIndex === monthIdx && hoveredBar?.type === "nvl";
-                const isSalesHovered = hoveredBar?.monthIndex === monthIdx && hoveredBar?.type === "sales";
-
-                // Opacity logic: removed dimming when hovering (columns remain fully visible)
-                const getOpacity = (barType: "sp" | "nvl" | "sales") => {
-                  return "1";
-                };
-
-                return (
-                  <g key={monthIdx}>
-                    {/* 1. SP BAR */}
-                    {showSP && (
-                      <g>
-                        <rect
-                          x={isSpHovered ? spX - hoverOffset : spX}
-                          y={spY}
-                          width={isSpHovered ? hoveredBarWidth : barWidth}
-                          height={spHeight}
-                          fill="hsl(215, 85%, 46%)"
-                          rx={0}
-                          opacity={getOpacity("sp")}
-                          className="transition-all duration-200 cursor-pointer"
-                          onMouseEnter={() => {
-                            setHoveredBar({
-                              monthIndex: monthIdx,
-                              monthLabel: data.label,
-                              type: "sp",
-                              value: data.sp,
-                              x: spX + barWidth / 2,
-                              y: spY
-                            });
-                          }}
-                          onMouseLeave={() => setHoveredBar(null)}
-                        />
-                        {/* Value label inside the bar section */}
-                        <text
-                          x={spX + barWidth / 2}
-                          y={spY - 4}
-                          textAnchor="middle"
-                          className="text-[7px] font-bold fill-slate-500 transition-all"
-                          opacity={getOpacity("sp")}
-                        >
-                          {data.sp}
-                        </text>
-                      </g>
-                    )}
-
-                    {/* 2. NVL BAR */}
-                    {showNVL && (
-                      <g>
-                        <rect
-                          x={isNvlHovered ? nvlX - hoverOffset : nvlX}
-                          y={nvlY}
-                          width={isNvlHovered ? hoveredBarWidth : barWidth}
-                          height={nvlHeight}
-                          fill="hsl(220, 60%, 18%)"
-                          rx={0}
-                          opacity={getOpacity("nvl")}
-                          className="transition-all duration-200 cursor-pointer"
-                          onMouseEnter={() => {
-                            setHoveredBar({
-                              monthIndex: monthIdx,
-                              monthLabel: data.label,
-                              type: "nvl",
-                              value: data.nvl,
-                              x: nvlX + barWidth / 2,
-                              y: nvlY
-                            });
-                          }}
-                          onMouseLeave={() => setHoveredBar(null)}
-                        />
-                        <text
-                          x={nvlX + barWidth / 2}
-                          y={nvlY - 4}
-                          textAnchor="middle"
-                          className="text-[7px] font-bold fill-slate-500 transition-all"
-                          opacity={getOpacity("nvl")}
-                        >
-                          {data.nvl}
-                        </text>
-                      </g>
-                    )}
-
-                    {/* 3. SALES BAR */}
-                    {showSales && (
-                      <g>
-                        <rect
-                          x={isSalesHovered ? salesX - hoverOffset : salesX}
-                          y={salesY}
-                          width={isSalesHovered ? hoveredBarWidth : barWidth}
-                          height={salesHeight}
-                          fill="hsl(215, 16%, 55%)"
-                          rx={0}
-                          opacity={getOpacity("sales")}
-                          className="transition-all duration-200 cursor-pointer"
-                          onMouseEnter={() => {
-                            setHoveredBar({
-                              monthIndex: monthIdx,
-                              monthLabel: data.label,
-                              type: "sales",
-                              value: data.sales,
-                              x: salesX + barWidth / 2,
-                              y: salesY
-                            });
-                          }}
-                          onMouseLeave={() => setHoveredBar(null)}
-                        />
-                        <text
-                          x={salesX + barWidth / 2}
-                          y={salesY - 4}
-                          textAnchor="middle"
-                          className="text-[7px] font-bold fill-slate-600 transition-all"
-                          opacity={getOpacity("sales")}
-                        >
-                          {data.sales}
-                        </text>
-                      </g>
-                    )}
-
-                    {/* X Axis Month Label */}
-                    <text
-                      x={83 + monthIdx * 80}
-                      y="208"
-                      textAnchor="middle"
-                      className={`transition-all duration-200 ${isMonthHovered ? "font-bold fill-slate-800" : "fill-slate-500"}`}
-                    >
-                      {data.label}
-                    </text>
-                  </g>
-                );
-              })}
-
-              {/* OVERLAY TRENDLINE CHART WHEN A BAR IS HOVERED */}
-              {hoveredBar && (() => {
-                const { pathD, points } = getTrendPathData(hoveredBar.type);
-                const activeColor = hoveredBar.type === "sp" ? "hsl(215, 85%, 46%)" : hoveredBar.type === "nvl" ? "hsl(220, 60%, 18%)" : "hsl(215, 16%, 55%)";
-                return (
-                  <g key={`trendline-${hoveredBar.type}`}>
-                    {/* Dotted helper vertical drop lines for each node */}
-                    {points.map((p, idx) => (
-                      <line
-                        key={`line-${idx}`}
-                        x1={p.x}
-                        y1={p.y}
-                        x2={p.x}
-                        y2="190"
-                        stroke={activeColor}
-                        strokeWidth="0.75"
-                        strokeDasharray="2,2"
-                        opacity="0.3"
-                        pointerEvents="none"
+                  return (
+                    <g key={idx} className="cursor-pointer group">
+                      {/* Stacked Bar background hover */}
+                      <rect
+                        x={colX - 18}
+                        y="15"
+                        width="36"
+                        height="180"
+                        fill="transparent"
+                        className="group-hover:fill-slate-50/50 transition-colors"
+                        onMouseEnter={() => {
+                          setHoveredTrendBar({
+                            x: colX,
+                            y: debtY,
+                            monthLabel: formatPeriodLabel(d.period),
+                            revenue: d.revenue,
+                            sales: d.sales,
+                            profit: d.profit
+                          });
+                        }}
+                        onMouseLeave={() => setHoveredTrendBar(null)}
                       />
-                    ))}
 
-                    {/* Faint, elegant dashed trendline as requested */}
+                      {/* Doanh thu thực thu (Bottom Rect) */}
+                      <rect
+                        x={colX - 12}
+                        y={revY}
+                        width="24"
+                        height={Math.max(2, revHeight)}
+                        fill="hsl(215, 85%, 46%)"
+                        rx="4"
+                        className="transition-all duration-300 group-hover:opacity-90"
+                      />
+
+                      {/* Công nợ phải thu (Top Rect) */}
+                      <rect
+                        x={colX - 12}
+                        y={debtY}
+                        width="24"
+                        height={Math.max(0, debtHeight)}
+                        fill="hsl(215, 16%, 65%)"
+                        rx="4"
+                        className="transition-all duration-300 group-hover:opacity-90"
+                      />
+
+                      {/* X Axis label */}
+                      <text x={colX} y="206" textAnchor="middle" className="text-[9px] font-bold fill-slate-500">
+                        {formatPeriodLabel(d.period)}
+                      </text>
+                    </g>
+                  );
+                });
+              })()}
+
+              {/* Draw Lợi nhuận Line Chart */}
+              {(() => {
+                const maxVal = Math.max(...finalTrend.map(d => Math.max(d.sales || 0, d.revenue || 0, Math.abs(d.profit || 0))), 160000000) || 160000000;
+                
+                const points = finalTrend.map((d, idx) => {
+                  const colX = 65 + idx * 80;
+                  const y = 190 - ((d.profit || 0) / maxVal) * 170;
+                  return { x: colX, y, profit: d.profit };
+                });
+
+                const pathD = points.map((p, idx) => (idx === 0 ? `M ${p.x} ${p.y}` : `L ${p.x} ${p.y}`)).join(" ");
+
+                return (
+                  <g>
+                    {/* Glow behind line */}
                     <path
                       d={pathD}
-                      stroke={activeColor}
-                      strokeWidth="1.5"
-                      strokeDasharray="4,4"
                       fill="none"
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                      opacity="0.55"
-                      pointerEvents="none"
+                      stroke="hsl(142, 71%, 45%)"
+                      strokeWidth="4"
+                      className="opacity-20 blur-sm"
                     />
-
-                    {/* Circular points along the trendline with a single focused badge */}
-                    {points.map((p, idx) => {
-                      const isCurrentNode = idx === hoveredBar.monthIndex;
-                      return (
-                        <g key={`node-${idx}`} pointerEvents="none">
-                          {isCurrentNode && (
-                            <circle
-                              cx={p.x}
-                              cy={p.y}
-                              r="7"
-                              fill={activeColor}
-                              opacity="0.2"
-                            />
-                          )}
-                          <circle
-                            cx={p.x}
-                            cy={p.y}
-                            r={isCurrentNode ? "4.5" : "2.5"}
-                            fill={isCurrentNode ? "#ffffff" : activeColor}
-                            stroke={activeColor}
-                            strokeWidth={isCurrentNode ? "2" : "0"}
-                            opacity={isCurrentNode ? "1" : "0.5"}
-                          />
-
-                          {/* Value overlay bubble ONLY for the currently hovered node */}
-                          {isCurrentNode && (
-                            <g transform={`translate(${p.x}, ${p.y - 14})`}>
-                              <rect
-                                x="-14"
-                                y="-6"
-                                width="28"
-                                height="12"
-                                rx="3.5"
-                                fill={activeColor}
-                                stroke="#ffffff"
-                                strokeWidth="0.5"
-                                style={{ filter: "drop-shadow(0 2px 4px rgba(0,0,0,0.12))" }}
-                              />
-                              <text
-                                x="0"
-                                y="2"
-                                textAnchor="middle"
-                                fill="#ffffff"
-                                fontSize="7.5px"
-                                fontWeight="bold"
-                              >
-                                {p.val}M
-                              </text>
-                            </g>
-                          )}
-                        </g>
-                      );
-                    })}
+                    {/* Active Line */}
+                    <path
+                      d={pathD}
+                      fill="none"
+                      stroke="hsl(142, 71%, 45%)"
+                      strokeWidth="2.5"
+                      strokeDasharray="4 2"
+                    />
+                    {/* Points on the line */}
+                    {points.map((p, idx) => (
+                      <circle
+                        key={idx}
+                        cx={p.x}
+                        cy={p.y}
+                        r="4"
+                        fill="white"
+                        stroke="hsl(142, 71%, 45%)"
+                        strokeWidth="2"
+                        className="transition-all hover:scale-150 cursor-pointer"
+                        onMouseEnter={() => {
+                          const t = finalTrend[idx];
+                          setHoveredTrendBar({
+                            x: p.x,
+                            y: p.y,
+                            monthLabel: formatPeriodLabel(t.period),
+                            revenue: t.revenue,
+                            sales: t.sales,
+                            profit: t.profit
+                          });
+                        }}
+                        onMouseLeave={() => setHoveredTrendBar(null)}
+                      />
+                    ))}
                   </g>
                 );
               })()}
             </svg>
-          </div>
 
-          <div className="border-t border-slate-50 pt-3 flex items-center justify-between text-[10px] text-slate-400">
-            <span>Dữ liệu cập nhật liên tục: 5 phút trước</span>
-            <span className="font-semibold text-slate-500">Đơn vị đo lường: Triệu VND (M)</span>
+            {/* Premium hover tooltip absolute box */}
+            {hoveredTrendBar && (
+              <div
+                style={{
+                  left: `${(hoveredTrendBar.x / 600) * 100}%`,
+                  top: `${Math.max(10, (hoveredTrendBar.y / 220) * 100 - 30)}%`
+                }}
+                className="absolute -translate-x-1/2 -translate-y-full bg-slate-900/95 backdrop-blur-md text-white p-3 rounded-xl shadow-xl text-[10px] pointer-events-none z-30 min-w-[150px] border border-white/10"
+              >
+                <div className="font-extrabold border-b border-white/10 pb-1 mb-1 text-slate-300">
+                  {hoveredTrendBar.monthLabel}
+                </div>
+                <div className="flex justify-between space-x-3 mt-1">
+                  <span className="text-slate-400">Doanh thu tạo ra:</span>
+                  <span className="font-bold font-mono">{formatMoney(hoveredTrendBar.sales)}</span>
+                </div>
+                <div className="flex justify-between space-x-3 mt-0.5">
+                  <span className="text-slate-400">Thực thu:</span>
+                  <span className="font-bold text-emerald-400 font-mono">{formatMoney(hoveredTrendBar.revenue)}</span>
+                </div>
+                <div className="flex justify-between space-x-3 mt-0.5">
+                  <span className="text-slate-400">Nợ phải thu:</span>
+                  <span className="font-bold text-amber-400 font-mono">{formatMoney(hoveredTrendBar.sales - hoveredTrendBar.revenue)}</span>
+                </div>
+                <div className="flex justify-between space-x-3 mt-1 pt-1 border-t border-white/10 font-black">
+                  <span className="text-slate-300">Lợi nhuận ròng:</span>
+                  <span className="font-mono text-emerald-300">{formatMoney(hoveredTrendBar.profit)}</span>
+                </div>
+              </div>
+            )}
           </div>
         </div>
 
-        {/* Right Panel: Top Customer Debt Table - 5 columns */}
-        <div className="lg:col-span-5 bg-white border border-slate-100 p-5 rounded-2xl shadow-sm flex flex-col justify-between">
+        {/* Cost Structure Donut Chart */}
+        <div className="bg-white border border-slate-100 rounded-3xl p-6 shadow-sm lg:col-span-4 flex flex-col justify-between">
           <div>
-            <h3 className="text-sm font-bold text-slate-800">Top 5 Công Nợ Khách Hàng Quá Hạn</h3>
-            <p className="text-[11px] text-slate-400 mt-1">
-              Phải thu lớn nhất cần đốc thúc để giải toả nghẽn dòng tiền.
-            </p>
+            <h3 className="text-sm font-bold text-slate-800">Cơ cấu Chi phí Doanh nghiệp</h3>
+            <p className="text-[10px] text-slate-400 mt-0.5">Phân bổ tỷ lệ các khoản chi sản xuất, nhân sự &amp; thuế.</p>
+          </div>
+
+          <div className="py-4 relative">
+            <svg width="180" height="180" viewBox="0 0 160 160" className="mx-auto overflow-visible">
+              <circle cx="80" cy="80" r="60" fill="transparent" stroke="#f8fafc" strokeWidth="16" />
+              {(() => {
+                let currentOffset = 0;
+                return finalCostStructure.map((item, idx) => {
+                  const circumference = 2 * Math.PI * 60; // 376.99
+                  const strokeDasharray = `${(item.percentage / 100) * circumference} ${circumference}`;
+                  const strokeDashoffset = -currentOffset - (circumference * 0.25); // -94.2 to start at 12 o'clock
+                  currentOffset += (item.percentage / 100) * circumference;
+
+                  const colors = [
+                    "hsl(215, 85%, 46%)",  // Production cost / Navy
+                    "hsl(142, 71%, 45%)",  // Labor / Green
+                    "hsl(38, 92%, 50%)"    // Tax & other / Orange
+                  ];
+
+                  return (
+                    <circle
+                      key={idx}
+                      cx="80"
+                      cy="80"
+                      r="60"
+                      fill="transparent"
+                      stroke={colors[idx % colors.length]}
+                      strokeWidth="16"
+                      strokeDasharray={strokeDasharray}
+                      strokeDashoffset={strokeDashoffset}
+                      className="transition-all duration-300 hover:stroke-[20px] cursor-pointer"
+                    />
+                  );
+                });
+              })()}
+              
+              {/* Inner label */}
+              <text x="80" y="78" textAnchor="middle" className="text-[11px] font-black fill-slate-700" style={{ fontFamily: "'Poppins', sans-serif" }}>Cơ cấu</text>
+              <text x="80" y="94" textAnchor="middle" className="text-[9px] font-black fill-slate-400" style={{ fontFamily: "'Poppins', sans-serif" }}>{formatMoney(totalCostVal)}</text>
+            </svg>
+          </div>
+
+          {/* Cost breakdown list */}
+          <div className="space-y-2 text-[10px] font-bold">
+            {finalCostStructure.map((item, idx) => {
+              const colors = [
+                "bg-blue-950",
+                "bg-emerald-500",
+                "bg-amber-500"
+              ];
+              return (
+                <div key={idx} className="flex justify-between items-center bg-slate-50/60 p-2 rounded-xl border border-slate-100">
+                  <span className="flex items-center text-slate-500">
+                    <span className={`w-2 h-2 rounded-full ${colors[idx % colors.length]} mr-1.5`}></span>
+                    {item.costName}
+                  </span>
+                  <span className="text-slate-800 font-mono">
+                    {formatMoney(item.amount)} ({item.percentage}%)
+                  </span>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      </div>
+
+      {/* Row 2 Charts: Customer Debt Ranking Bar Chart & Debt Table */}
+      <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
+        {/* Debt Bar Chart */}
+        <div className="bg-white border border-slate-100 rounded-3xl p-6 shadow-sm lg:col-span-7 flex flex-col justify-between">
+          <div>
+            <h3 className="text-sm font-bold text-slate-800">Xếp hạng Công nợ Khách hàng</h3>
+            <p className="text-[10px] text-slate-400 mt-0.5">Biểu đồ thanh ngang so sánh trị giá nợ chưa thu hồi theo khách hàng.</p>
+          </div>
+
+          {/* SVG Horizontal Bar Chart */}
+          <div className="py-4">
+            <svg className="w-full" viewBox="0 0 450 200">
+              {/* Axes lines */}
+              <line x1="120" y1="10" x2="120" y2="180" stroke="#cbd5e1" strokeWidth="1" />
+              <line x1="120" y1="180" x2="420" y2="180" stroke="#cbd5e1" strokeWidth="1" />
+
+              {/* Grid indicators */}
+              <line x1="220" y1="10" x2="220" y2="180" stroke="#f1f5f9" strokeDasharray="3 3" />
+              <line x1="320" y1="10" x2="320" y2="180" stroke="#f1f5f9" strokeDasharray="3 3" />
+              <line x1="420" y1="10" x2="420" y2="180" stroke="#f1f5f9" strokeDasharray="3 3" />
+
+              {/* Grid scale labels */}
+              <text x="220" y="192" textAnchor="middle" className="text-[8px] font-bold fill-slate-400 font-mono">40M</text>
+              <text x="320" y="192" textAnchor="middle" className="text-[8px] font-bold fill-slate-400 font-mono">80M</text>
+              <text x="420" y="192" textAnchor="middle" className="text-[8px] font-bold fill-slate-400 font-mono">120M</text>
+
+              {(() => {
+                const maxVal = Math.max(...finalCustomerDebt.map(c => c.debtAmount || 0), 120000000) || 120000000;
+                return finalCustomerDebt.map((c, idx) => {
+                  const barY = 22 + idx * 32;
+                  const barWidth = ((c.debtAmount || 0) / maxVal) * 290;
+
+                  // Color scheme based on severity
+                  let barColor = "hsl(142, 71%, 45%)"; // Safe Green
+                  if (c.debtAmount > 100000000) barColor = "hsl(0, 72%, 51%)"; // Danger Red
+                  else if (c.debtAmount > 45000000) barColor = "hsl(38, 92%, 50%)"; // Warning Orange
+
+                  return (
+                    <g key={idx}>
+                      {/* Y label (Customer Name truncated) */}
+                      <text
+                        x="110"
+                        y={barY + 9}
+                        textAnchor="end"
+                        className="text-[9px] font-bold fill-slate-600 font-sans"
+                      >
+                        {c.customerName.length > 18 ? c.customerName.slice(0, 16) + "..." : c.customerName}
+                      </text>
+
+                      {/* Bar */}
+                      <rect
+                        x="121"
+                        y={barY}
+                        width={Math.max(4, barWidth)}
+                        height="12"
+                        fill={barColor}
+                        rx="3"
+                        className="transition-all duration-500 hover:opacity-90 cursor-pointer"
+                      />
+
+                      {/* Value label */}
+                      <text
+                        x={125 + barWidth}
+                        y={barY + 9}
+                        textAnchor="start"
+                        className="text-[8px] font-bold fill-slate-500 font-mono"
+                      >
+                        {formatMoney(c.debtAmount)}
+                      </text>
+                    </g>
+                  );
+                });
+              })()}
+            </svg>
+          </div>
+        </div>
+
+        {/* Customer Overdue Debt Detailed Table */}
+        <div className="bg-white border border-slate-100 rounded-3xl p-6 shadow-sm lg:col-span-5 flex flex-col justify-between">
+          <div>
+            <h3 className="text-sm font-bold text-slate-800">Sổ nợ &amp; Mức độ Rủi ro</h3>
+            <p className="text-[10px] text-slate-400 mt-0.5">Theo dõi thời gian trễ thanh toán để xử lý thu hồi công nợ.</p>
           </div>
 
           <div className="my-4 overflow-x-auto">
-            <table className="w-full text-left border-collapse text-xs">
+            <table className="w-full text-xs text-left">
               <thead>
-                <tr className="border-b border-slate-100 text-slate-400 font-medium pb-2">
+                <tr className="border-b border-slate-100 text-[10px] font-black text-slate-400 uppercase tracking-wider">
                   <th className="py-2 pl-1">Khách hàng</th>
-                  <th className="py-2 text-right">Tổng nợ</th>
-                  <th className="py-2 text-right">Quá hạn</th>
-                  <th className="py-2 pr-1 text-right">Trạng thái</th>
+                  <th className="py-2 text-right">Trị giá nợ</th>
+                  <th className="py-2 text-right pr-1">Phân loại</th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-slate-50">
-                {overdueDebts.map((item, idx) => (
-                  <tr key={idx} className="hover:bg-slate-50/50 transition-colors">
-                    <td className="py-2.5 font-semibold text-slate-700 pl-1">{item.client}</td>
-                    <td className="py-2.5 text-right font-mono text-slate-900">{formatMoney(item.debt)}</td>
-                    <td className="py-2.5 text-right text-slate-500 font-mono">{item.days} ngày</td>
-                    <td className="py-2.5 text-right pr-1">
-                      {item.status === "DANGER" ? (
-                        <span className="px-1.5 py-0.5 rounded text-[9px] font-bold bg-terracotta-light text-terracotta">Nợ xấu</span>
-                      ) : item.status === "WARNING" ? (
-                        <span className="px-1.5 py-0.5 rounded text-[9px] font-bold bg-sage-amber-light text-sage-amber">Cần đòi</span>
-                      ) : (
-                        <span className="px-1.5 py-0.5 rounded text-[9px] font-bold bg-emerald-green-light text-emerald-green">An toàn</span>
-                      )}
-                    </td>
-                  </tr>
-                ))}
+              <tbody>
+                {finalCustomerDebt.map((item, idx) => {
+                  const status = item.debtAmount > 100000000 ? "DANGER" : item.debtAmount > 45000000 ? "WARNING" : "GOOD";
+                  return (
+                    <tr key={idx} className="hover:bg-slate-50/50 transition-colors">
+                      <td className="py-2.5 font-bold text-slate-700 pl-1 truncate max-w-[150px]">
+                        {item.customerName}
+                      </td>
+                      <td className="py-2.5 text-right font-mono font-bold text-slate-900">
+                        {formatMoney(item.debtAmount)}
+                      </td>
+                      <td className="py-2.5 text-right pr-1 font-bold">
+                        {status === "DANGER" ? (
+                          <span className="px-2 py-0.5 rounded-full text-[9px] bg-rose-50 text-rose-600 border border-rose-100">Nợ xấu</span>
+                        ) : status === "WARNING" ? (
+                          <span className="px-2 py-0.5 rounded-full text-[9px] bg-amber-50 text-amber-600 border border-amber-100">Cần đòi</span>
+                        ) : (
+                          <span className="px-2 py-0.5 rounded-full text-[9px] bg-emerald-50 text-emerald-600 border border-emerald-100">An toàn</span>
+                        )}
+                      </td>
+                    </tr>
+                  );
+                })}
               </tbody>
             </table>
           </div>
 
           <div className="border-t border-slate-50 pt-3 text-center">
-            <button className="text-xs text-slate-teal font-semibold hover:underline inline-flex items-center space-x-1">
+            <button className="text-[10px] text-slate-teal font-extrabold hover:underline inline-flex items-center space-x-1 cursor-pointer bg-transparent border-0">
               <span>Xem Sổ nợ chi tiết &amp; Đặt hạn mức tín dụng</span>
               <ArrowRight className="w-3 h-3" />
             </button>
           </div>
         </div>
+      </div>
+
+      {/* Simulator Box: For Testing WebSocket Notifications */}
+      <div className="bg-white border border-slate-100 rounded-3xl p-6 shadow-sm" id="websocket-simulator-box">
+        <div className="border-b border-slate-100 pb-3 mb-4">
+          <h3 className="text-sm font-black text-slate-800 flex items-center font-display">
+            <span className="w-2.5 h-2.5 rounded-full bg-slate-teal mr-2 animate-pulse"></span>
+            Trình Giả Lập Phát Thông Báo (WebSocket Testing Sandbox)
+          </h3>
+          <p className="text-[10px] text-slate-400 mt-0.5">
+            Sử dụng form này để gửi lệnh mô phỏng thông báo phê duyệt thời gian thực đến broker. Hệ thống sẽ phát trực tiếp qua WebSocket đến tài khoản của bạn.
+          </p>
+        </div>
+
+        <form onSubmit={handleSimulateSubmit} className="grid grid-cols-1 md:grid-cols-3 gap-4">
+          <div className="space-y-1">
+            <label className="text-[10px] font-bold text-slate-500 block uppercase">Tiêu đề thông báo</label>
+            <input
+              type="text"
+              value={simTitle}
+              onChange={(e) => setSimTitle(e.target.value)}
+              className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-xs font-bold text-slate-700 focus:outline-none focus:border-slate-teal"
+              placeholder="Nhập tiêu đề..."
+              required
+            />
+          </div>
+          <div className="space-y-1">
+            <label className="text-[10px] font-bold text-slate-500 block uppercase">Nội dung thông báo</label>
+            <input
+              type="text"
+              value={simMessage}
+              onChange={(e) => setSimMessage(e.target.value)}
+              className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-xs font-medium text-slate-600 focus:outline-none focus:border-slate-teal"
+              placeholder="Nhập nội dung chi tiết..."
+              required
+            />
+          </div>
+          <div className="flex items-end space-x-3">
+            <div className="space-y-1 flex-1">
+              <label className="text-[10px] font-bold text-slate-500 block uppercase">Loại nghiệp vụ</label>
+              <select
+                value={simType}
+                onChange={(e) => setSimType(e.target.value)}
+                className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-xs font-bold text-slate-700 focus:outline-none focus:border-slate-teal"
+              >
+                <option value="ORDER">Đơn Hàng Bán (ORDER)</option>
+                <option value="CONTRACT">Hợp Đồng Mới (CONTRACT)</option>
+                <option value="LEAVE">Nghỉ Phép (LEAVE)</option>
+              </select>
+            </div>
+            <button
+              type="submit"
+              disabled={isSimulating}
+              className="py-2 px-5 bg-slate-teal hover:bg-slate-teal-hover disabled:opacity-50 text-white rounded-xl text-xs font-bold transition-all shadow-md flex items-center justify-center shrink-0 cursor-pointer h-[34px]"
+            >
+              {isSimulating ? "Đang gửi..." : "Gửi giả lập"}
+            </button>
+          </div>
+        </form>
+
+        {simSuccess && (
+          <div className="mt-3 text-xs bg-emerald-50 text-emerald-600 border border-emerald-100 p-2.5 rounded-xl font-bold animate-in fade-in duration-200">
+            {simSuccess}
+          </div>
+        )}
       </div>
 
       {/* Quick Approval Inbox Segment */}
