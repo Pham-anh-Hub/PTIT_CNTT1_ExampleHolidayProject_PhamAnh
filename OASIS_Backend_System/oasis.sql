@@ -1,9 +1,3 @@
--- =======================================================
--- KỊCH BẢN KHỞI TẠO CƠ SỞ DỮ LIỆU SAAS ERP - MYSQL 8.0+
--- Tác giả: AI Assistant (Senior Data Analyst/Architect)
--- Mô hình: Shared-Database, Shared-Schema (Tenant ID)
--- =======================================================
-
 -- CREATE DATABASE oasis_system_database;
 USE oasis_system_database;
 
@@ -376,22 +370,6 @@ CREATE TABLE production_stage_work_logs (
     computed_amount DECIMAL(15,2) NOT NULL,
     CONSTRAINT fk_worklog_stage FOREIGN KEY (production_stage_id) REFERENCES production_stages(id) ON DELETE CASCADE,
     CONSTRAINT fk_worklog_employee FOREIGN KEY (employee_id) REFERENCES employees(id) ON DELETE CASCADE
-);
-
--- 25. Bảng recruitment_posts (Nhật ký tin tuyển dụng đã đăng bên ngoài - Bổ sung vào Nhóm 2)
-CREATE TABLE recruitment_posts (
-    id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
-    company_id BIGINT UNSIGNED NOT NULL,
-    title VARCHAR(255) NOT NULL,
-    content TEXT NULL,
-    external_url VARCHAR(500) NULL,
-    platform VARCHAR(100) NULL,
-    status VARCHAR(50) NOT NULL DEFAULT 'Đã đăng',
-    posted_at DATETIME NULL,
-    created_by BIGINT UNSIGNED NOT NULL,
-    created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    CONSTRAINT fk_recruitment_company FOREIGN KEY (company_id) REFERENCES companies(id) ON DELETE CASCADE,
-    CONSTRAINT fk_recruitment_creator FOREIGN KEY (created_by) REFERENCES users(id) ON DELETE RESTRICT
 );
 
 SET FOREIGN_KEY_CHECKS = 1;

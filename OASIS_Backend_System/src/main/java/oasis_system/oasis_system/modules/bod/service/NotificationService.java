@@ -37,28 +37,43 @@ public class NotificationService {
         Company company = companyRepository.findById(companyId)
                 .orElseThrow(() -> new IllegalArgumentException("Không tìm thấy doanh nghiệp có ID: " + companyId));
 
-        // 1. Tạo thực thể lưu trữ vào database
+        // 1. Xác định targetRole (nếu chưa có thì mặc định là BOD hoặc dựa trên type)
+        String targetRole = payload.getTargetRole();
+        if (targetRole == null || targetRole.isBlank()) {
+            if ("ACCOUNTANT_EXPLANATION".equals(payload.getType())) {
+                targetRole = "ACCOUNTANT";
+            } else {
+                targetRole = "BOD";
+            }
+        }
+
+        // 1b. Tạo thực thể lưu trữ vào database
         Notification notification = Notification.builder()
                 .company(company)
                 .title(payload.getTitle())
                 .message(payload.getMessage())
                 .type(payload.getType())
                 .referenceId(payload.getReferenceId())
+                .targetRole(targetRole)
                 .isRead(false)
                 .build();
 
         notification = notificationRepository.save(notification);
 
-        // 2. Gán ID vừa được sinh vào payload và phát qua WebSocket
+        // 2. Gán ID & targetRole vừa sinh vào payload và phát qua WebSocket
         payload.setId(notification.getId());
+        payload.setTargetRole(targetRole);
         payload.setTimestamp(notification.getCreatedAt());
 
-        String destination = "/topic/approvals/" + companyId;
+        // Nếu thông báo dành cho Accountant -> phát tới channel accountant, ngược lại tới approvals
+        String destination = "ACCOUNTANT".equals(targetRole) 
+                ? "/topic/accountant/notifications" 
+                : "/topic/approvals/" + companyId;
         messagingTemplate.convertAndSend(destination, payload);
     }
 
     /**
-     * Lấy danh sách lịch sử thông báo của doanh nghiệp hiện tại.
+     * Lấy danh sách lịch sử thông báo của doanh nghiệp dành riêng cho BOD.
      */
     @Transactional(readOnly = true)
     public List<Notification> getNotifications() {
@@ -66,11 +81,15 @@ public class NotificationService {
         if (companyId == null) {
             throw new IllegalStateException("Không tìm thấy thông tin doanh nghiệp hiện tại. Vui lòng đăng nhập lại.");
         }
-        return notificationRepository.findByCompanyIdOrderByCreatedAtDesc(companyId);
+        // Lọc thông báo dành cho BOD (bao gồm BOD và null/rỗng cho tương thích ngược)
+        return notificationRepository.findByCompanyIdOrderByCreatedAtDesc(companyId)
+                .stream()
+                .filter(n -> n.getTargetRole() == null || "BOD".equalsIgnoreCase(n.getTargetRole()))
+                .toList();
     }
 
     /**
-     * Đếm số lượng thông báo chưa đọc của doanh nghiệp hiện tại.
+     * Đếm số lượng thông báo chưa đọc dành riêng cho BOD.
      */
     @Transactional(readOnly = true)
     public long getUnreadCount() {
@@ -78,7 +97,10 @@ public class NotificationService {
         if (companyId == null) {
             throw new IllegalStateException("Không tìm thấy thông tin doanh nghiệp hiện tại. Vui lòng đăng nhập lại.");
         }
-        return notificationRepository.countByCompanyIdAndIsReadFalse(companyId);
+        return notificationRepository.findByCompanyIdOrderByCreatedAtDesc(companyId)
+                .stream()
+                .filter(n -> !n.getIsRead() && (n.getTargetRole() == null || "BOD".equalsIgnoreCase(n.getTargetRole())))
+                .count();
     }
 
     /**

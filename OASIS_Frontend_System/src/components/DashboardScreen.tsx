@@ -19,6 +19,10 @@ interface DashboardScreenProps {
   onRejectContract: (id: string, reason: string) => void;
   onApproveLeave: (id: string) => void;
   onRejectLeave: (id: string, reason: string) => void;
+  liveNotifications?: any[];
+  targetNotificationId?: number | null;
+  onClearTargetNotification?: () => void;
+  onMarkNotificationRead?: (id: number) => void;
   materialImports?: MaterialImport[];
   supplierPayables?: SupplierPayable[];
   corporateTaxRate?: number;
@@ -34,6 +38,10 @@ export default function DashboardScreen({
   onRejectContract,
   onApproveLeave,
   onRejectLeave,
+  liveNotifications = [],
+  targetNotificationId,
+  onClearTargetNotification,
+  onMarkNotificationRead,
   materialImports = [],
   supplierPayables = [],
   corporateTaxRate = 20
@@ -46,6 +54,7 @@ export default function DashboardScreen({
   } | null>(null);
   const [rejectionReason, setRejectionReason] = useState("");
   const [showRejectForm, setShowRejectForm] = useState(false);
+  const [showConfirmApprove, setShowConfirmApprove] = useState(false);
 
   // Dynamic States for API data
   const [kpiData, setKpiData] = useState<{
@@ -149,49 +158,66 @@ export default function DashboardScreen({
     return new Intl.NumberFormat("vi-VN", { style: "currency", currency: "VND" }).format(amount || 0);
   };
 
-  // Build approval queue list
+  // Build approval queue list từ dữ liệu thật
   const approvalQueue: { id: string; title: string; subtitle: string; amount?: number; type: "ORDER" | "CONTRACT" | "LEAVE"; data: any; date: string }[] = [];
 
-  pendingOrders.forEach((o) => {
+  liveNotifications.filter(n => !n.isRead && (!n.targetRole || n.targetRole === "BOD") && n.type !== "ACCOUNTANT_EXPLANATION").forEach((n) => {
+    let tType: "ORDER" | "CONTRACT" | "LEAVE" = "ORDER";
+    if (n.type === "CONTRACT") tType = "CONTRACT";
+    if (n.type === "LEAVE") tType = "LEAVE";
+
+    // Phân tích nhanh message để lấy thông tin giả lập số tiền nếu có
+    let amt: number | undefined;
+    const match = (n.message || "").match(/([0-9.,]+)\s*[đd]/i);
+    if (match) {
+      amt = parseInt(match[1].replace(/[,.]/g, ""), 10);
+    }
+
     approvalQueue.push({
-      id: o.id,
-      title: `Phê duyệt Đơn hàng ${o.code}`,
-      subtitle: `Khách hàng: ${o.customerName}`,
-      amount: o.totalAmount,
-      type: "ORDER",
-      data: o,
-      date: o.orderDate
+      id: String(n.id || n.referenceId || Math.random()),
+      title: n.title,
+      subtitle: n.message,
+      amount: amt,
+      type: tType,
+      data: n,
+      date: n.createdAt ? n.createdAt.substring(0, 10) : new Date().toISOString().substring(0, 10)
     });
   });
 
-  pendingContracts.forEach((c) => {
-    approvalQueue.push({
-      id: c.id,
-      title: `Phê duyệt HĐLD ${c.code}`,
-      subtitle: `Nhân sự: ${c.employeeName} (${c.type})`,
-      amount: c.basicSalary,
-      type: "CONTRACT",
-      data: c,
-      date: c.startDate
-    });
-  });
+  // Xử lý tự động chọn thông báo từ chuông
+  useEffect(() => {
+    if (targetNotificationId && approvalQueue.length > 0) {
+      const item = approvalQueue.find((q) => q.data.id === targetNotificationId);
+      if (item) {
+        setSelectedInboxItem({ id: item.id, type: item.type, data: item.data });
+        setShowRejectForm(false);
+        setTimeout(() => {
+          document.getElementById('quick-approval-inbox-section')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+        }, 300);
+      }
+      if (onClearTargetNotification) {
+        onClearTargetNotification();
+      }
+    }
+  }, [targetNotificationId, approvalQueue, onClearTargetNotification]);
 
-  pendingLeaves.forEach((l) => {
-    approvalQueue.push({
-      id: l.id,
-      title: `Đơn xin nghỉ phép của ${l.employeeName}`,
-      subtitle: `Lý do: ${l.reason}`,
-      type: "LEAVE",
-      data: l,
-      date: l.startDate
-    });
-  });
+  const handleApproveClick = () => {
+    setShowConfirmApprove(true);
+  };
 
-  const handleApprove = (item: typeof approvalQueue[0]) => {
+  const handleConfirmApprove = () => {
+    if (!selectedInboxItem) return;
     startTransition(() => {
-      if (item.type === "ORDER") onApproveOrder(item.id);
-      else if (item.type === "CONTRACT") onApproveContract(item.id);
-      else if (item.type === "LEAVE") onApproveLeave(item.id);
+      if (onMarkNotificationRead && selectedInboxItem.data.id) {
+        // Gọi API mark read thông qua prop truyền xuống
+        onMarkNotificationRead(selectedInboxItem.data.id);
+      } else {
+        // Fallback cho mock data cũ nếu có
+        if (selectedInboxItem.type === "ORDER") onApproveOrder(selectedInboxItem.id);
+        else if (selectedInboxItem.type === "CONTRACT") onApproveContract(selectedInboxItem.id);
+        else if (selectedInboxItem.type === "LEAVE") onApproveLeave(selectedInboxItem.id);
+      }
+      setShowConfirmApprove(false);
       setSelectedInboxItem(null);
     });
   };
@@ -199,22 +225,26 @@ export default function DashboardScreen({
   const handleRejectSubmit = () => {
     if (!selectedInboxItem || !rejectionReason.trim()) return;
     startTransition(() => {
-      const { id, type } = selectedInboxItem;
-      if (type === "ORDER") onRejectOrder(id, rejectionReason);
-      else if (type === "CONTRACT") onRejectContract(id, rejectionReason);
-      else if (type === "LEAVE") onRejectLeave(id, rejectionReason);
+      if (onMarkNotificationRead && selectedInboxItem.data.id) {
+        // Gọi API mark read để đánh dấu thông báo này là đã xử lý (từ chối)
+        onMarkNotificationRead(selectedInboxItem.data.id);
+      } else {
+        const { id, type } = selectedInboxItem;
+        if (type === "ORDER") onRejectOrder(id, rejectionReason);
+        else if (type === "CONTRACT") onRejectContract(id, rejectionReason);
+        else if (type === "LEAVE") onRejectLeave(id, rejectionReason);
+      }
       setRejectionReason("");
       setShowRejectForm(false);
       setSelectedInboxItem(null);
     });
   };
 
-  // Formatter for Period label
   const formatPeriodLabel = (p: string) => {
     if (!p) return "";
     const parts = p.split("-");
     if (parts.length === 2) {
-      return `Tháng ${parts[1]}`;
+      return `Tháng ${parseInt(parts[1], 10)}`;
     }
     return p;
   };
@@ -306,81 +336,81 @@ export default function DashboardScreen({
         {/* Card 1: Doanh thu danh nghĩa */}
         <div className="bg-white border border-slate-100 p-5 rounded-2xl shadow-sm hover:shadow-md transition-all duration-200">
           <div className="flex justify-between items-start">
-            <span className="text-xs font-semibold text-slate-400">Doanh thu Danh nghĩa</span>
+            <span className="text-[13px] font-medium text-slate-600 font-sans">Doanh thu Danh nghĩa</span>
             <span className="p-1.5 rounded-xl bg-slate-50 text-slate-600">
               <DollarSign className="w-4 h-4" />
             </span>
           </div>
           <div className="mt-3">
-            <h3 className="text-lg font-black text-slate-800 tracking-tight font-mono">
+            <h3 className="text-xl font-semibold text-slate-800 tracking-tight font-sans">
               {formatMoney(kpiData.totalRevenue)}
             </h3>
-            <span className="text-[10px] text-slate-400 block mt-1">Trị giá đơn hàng đã ký duyệt</span>
+            <span className="text-xs text-slate-400 block mt-1 font-sans">Trị giá đơn hàng đã ký duyệt</span>
           </div>
         </div>
 
         {/* Card 2: Doanh thu Thực thu */}
         <div className="bg-white border border-slate-100 p-5 rounded-2xl shadow-sm hover:shadow-md transition-all duration-200">
           <div className="flex justify-between items-start">
-            <span className="text-xs font-semibold text-slate-400">Thực thu nhận về</span>
+            <span className="text-[13px] font-medium text-slate-600 font-sans">Thực thu nhận về</span>
             <span className="px-2 py-0.5 rounded-full bg-emerald-green-light text-emerald-green text-[10px] font-bold flex items-center space-x-1">
               <TrendingUp className="w-3 h-3" />
               <span>Thực tế</span>
             </span>
           </div>
           <div className="mt-3">
-            <h3 className="text-lg font-black text-slate-800 tracking-tight font-mono">
+            <h3 className="text-xl font-semibold text-slate-800 tracking-tight font-sans">
               {formatMoney(kpiData.actualRevenue)}
             </h3>
-            <span className="text-[10px] text-slate-400 block mt-1">Dòng tiền thực thu từ khách</span>
+            <span className="text-xs text-slate-400 block mt-1 font-sans">Dòng tiền thực thu từ khách</span>
           </div>
         </div>
 
         {/* Card 3: Chi chi phí vận hành */}
         <div className="bg-white border border-slate-100 p-5 rounded-2xl shadow-sm hover:shadow-md transition-all duration-200">
           <div className="flex justify-between items-start">
-            <span className="text-xs font-semibold text-slate-400">Tổng Chi phí Vận hành</span>
+            <span className="text-[13px] font-medium text-slate-600 font-sans">Tổng Chi phí Vận hành</span>
             <span className="p-1.5 rounded-xl bg-rose-50 text-rose-600">
               <Wallet className="w-4 h-4" />
             </span>
           </div>
           <div className="mt-3">
-            <h3 className="text-lg font-black text-slate-800 tracking-tight font-mono">
+            <h3 className="text-xl font-semibold text-slate-800 tracking-tight font-sans">
               {formatMoney(kpiData.totalProductionCost)}
             </h3>
-            <span className="text-[10px] text-slate-400 block mt-1">Ngân sách vật tư, nhân công</span>
+            <span className="text-xs text-slate-400 block mt-1 font-sans">Ngân sách vật tư, nhân công</span>
           </div>
         </div>
 
         {/* Card 4: Lợi nhuận ròng */}
         <div className="bg-white border border-slate-100 p-5 rounded-2xl shadow-sm hover:shadow-md transition-all duration-200">
           <div className="flex justify-between items-start">
-            <span className="text-xs font-semibold text-slate-400">Lợi nhuận ròng</span>
+            <span className="text-[13px] font-medium text-slate-600 font-sans">Lợi nhuận ròng</span>
             <span className="px-2 py-0.5 rounded-full bg-slate-teal-light text-slate-teal text-[9px] font-bold">
               Biên lãi: {marginRate}%
             </span>
           </div>
           <div className="mt-3">
-            <h3 className="text-lg font-black text-slate-teal tracking-tight font-mono">
+            <h3 className="text-xl font-semibold text-slate-teal tracking-tight font-sans">
               {formatMoney(kpiData.netProfit)}
             </h3>
-            <span className="text-[10px] text-slate-400 block mt-1">Doanh thu trừ hết mọi chi phí</span>
+            <span className="text-xs text-slate-400 block mt-1 font-sans">Doanh thu trừ hết mọi chi phí</span>
           </div>
         </div>
 
         {/* Card 5: Tổng nợ khách hàng */}
         <div className="bg-white border border-slate-100 p-5 rounded-2xl shadow-sm hover:shadow-md transition-all duration-200">
           <div className="flex justify-between items-start">
-            <span className="text-xs font-semibold text-slate-400">Công nợ khách hàng</span>
+            <span className="text-[13px] font-medium text-slate-600 font-sans">Công nợ khách hàng</span>
             <span className="p-1.5 rounded-xl bg-amber-50 text-amber-600">
               <Landmark className="w-4 h-4" />
             </span>
           </div>
           <div className="mt-3">
-            <h3 className="text-lg font-black text-amber-700 tracking-tight font-mono">
+            <h3 className="text-xl font-semibold text-amber-700 tracking-tight font-sans">
               {formatMoney(kpiData.totalDebt)}
             </h3>
-            <span className="text-[10px] text-slate-400 block mt-1">Chưa thu hồi (sales - thực thu)</span>
+            <span className="text-xs text-slate-400 block mt-1 font-sans">Chưa thu hồi (sales - thực thu)</span>
           </div>
         </div>
       </div>
@@ -470,9 +500,7 @@ export default function DashboardScreen({
                         y={revY}
                         width="24"
                         height={Math.max(2, revHeight)}
-                        fill="hsl(215, 85%, 46%)"
-                        rx="4"
-                        className="transition-all duration-300 group-hover:opacity-90"
+                        className="transition-all duration-300 group-hover:opacity-90 fill-blue-950"
                       />
 
                       {/* Công nợ phải thu (Top Rect) */}
@@ -481,9 +509,7 @@ export default function DashboardScreen({
                         y={debtY}
                         width="24"
                         height={Math.max(0, debtHeight)}
-                        fill="hsl(215, 16%, 65%)"
-                        rx="4"
-                        className="transition-all duration-300 group-hover:opacity-90"
+                        className="transition-all duration-300 group-hover:opacity-90 fill-slate-300"
                       />
 
                       {/* X Axis label */}
@@ -514,7 +540,7 @@ export default function DashboardScreen({
                       d={pathD}
                       fill="none"
                       stroke="hsl(142, 71%, 45%)"
-                      strokeWidth="4"
+                      strokeWidth="3"
                       className="opacity-20 blur-sm"
                     />
                     {/* Active Line */}
@@ -522,7 +548,7 @@ export default function DashboardScreen({
                       d={pathD}
                       fill="none"
                       stroke="hsl(142, 71%, 45%)"
-                      strokeWidth="2.5"
+                      strokeWidth="1.5"
                       strokeDasharray="4 2"
                     />
                     {/* Points on the line */}
@@ -535,7 +561,7 @@ export default function DashboardScreen({
                         fill="white"
                         stroke="hsl(142, 71%, 45%)"
                         strokeWidth="2"
-                        className="transition-all hover:scale-150 cursor-pointer"
+                        className="transition-all cursor-pointer"
                         onMouseEnter={() => {
                           const t = finalTrend[idx];
                           setHoveredTrendBar({
@@ -669,8 +695,8 @@ export default function DashboardScreen({
           </div>
 
           {/* SVG Horizontal Bar Chart */}
-          <div className="py-4">
-            <svg className="w-full" viewBox="0 0 450 200">
+          <div className="py-4 overflow-visible">
+            <svg className="w-full overflow-visible" viewBox="0 0 550 200">
               {/* Axes lines */}
               <line x1="120" y1="10" x2="120" y2="180" stroke="#cbd5e1" strokeWidth="1" />
               <line x1="120" y1="180" x2="420" y2="180" stroke="#cbd5e1" strokeWidth="1" />
@@ -701,7 +727,7 @@ export default function DashboardScreen({
                       {/* Y label (Customer Name truncated) */}
                       <text
                         x="110"
-                        y={barY + 9}
+                        y={barY + 13}
                         textAnchor="end"
                         className="text-[9px] font-bold fill-slate-600 font-sans"
                       >
@@ -713,16 +739,16 @@ export default function DashboardScreen({
                         x="121"
                         y={barY}
                         width={Math.max(4, barWidth)}
-                        height="12"
+                        height="20"
                         fill={barColor}
-                        rx="3"
+                        rx="0"
                         className="transition-all duration-500 hover:opacity-90 cursor-pointer"
                       />
 
                       {/* Value label */}
                       <text
                         x={125 + barWidth}
-                        y={barY + 9}
+                        y={barY + 13}
                         textAnchor="start"
                         className="text-[8px] font-bold fill-slate-500 font-mono"
                       >
@@ -828,12 +854,33 @@ export default function DashboardScreen({
               <label className="text-[10px] font-bold text-slate-500 block uppercase">Loại nghiệp vụ</label>
               <select
                 value={simType}
-                onChange={(e) => setSimType(e.target.value)}
+                onChange={(e) => {
+                  const val = e.target.value;
+                  setSimType(val);
+                  if (val === 'ORDER') {
+                    setSimTitle("Đề xuất đơn hàng mới chờ duyệt");
+                    setSimMessage("Đơn hàng DH-2026-008 vượt ngưỡng trị giá 75,000,000 VND cần Giám đốc ký duyệt số.");
+                  } else if (val === 'CONTRACT') {
+                    setSimTitle("Đề xuất hợp đồng lao động mới");
+                    setSimMessage("Hợp đồng thử việc nhân viên Nguyễn Văn A (Phòng Kế toán) - Mức lương: 15,000,000 VND.");
+                  } else if (val === 'LEAVE') {
+                    setSimTitle("Đề xuất đơn nghỉ phép chờ duyệt");
+                    setSimMessage("Đơn xin nghỉ phép 3 ngày làm việc của nhân viên Lê Thị B (Phòng Sản xuất) lý do việc cá nhân.");
+                  } else if (val === 'PRODUCTION_PLAN') {
+                    setSimTitle("Dự toán Kế hoạch Sản xuất MTO");
+                    setSimMessage("Dự toán Kế hoạch sản xuất KH-2026-08 (10.000 sản phẩm) - Xin rút 450.000.000 VNĐ tiền vải.");
+                  } else if (val === 'MATERIAL_EXTRA') {
+                    setSimTitle("Yêu cầu Cấp bù Nguyên vật tư");
+                    setSimMessage("Sản xuất lỗi rập 40m vải Kaki - Xin duyệt cấp bù 28.000.000 VNĐ tiền vải thay thế.");
+                  }
+                }}
                 className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-xs font-bold text-slate-700 focus:outline-none focus:border-slate-teal"
               >
                 <option value="ORDER">Đơn Hàng Bán (ORDER)</option>
                 <option value="CONTRACT">Hợp Đồng Mới (CONTRACT)</option>
                 <option value="LEAVE">Nghỉ Phép (LEAVE)</option>
+                <option value="PRODUCTION_PLAN">Kế Hoạch Sản Xuất (PRODUCTION_PLAN)</option>
+                <option value="MATERIAL_EXTRA">Cấp Bù Vật Tư (MATERIAL_EXTRA)</option>
               </select>
             </div>
             <button
@@ -942,133 +989,18 @@ export default function DashboardScreen({
                   </div>
 
                   {/* Render content depending on selected type */}
-                  {selectedInboxItem.type === "ORDER" && (
-                    <div className="space-y-3 text-xs">
-                      <div className="grid grid-cols-2 gap-4">
-                        <div>
-                          <div className="text-slate-400 font-medium">Khách hàng</div>
-                          <div className="font-semibold text-slate-800 mt-0.5">{selectedInboxItem.data.customerName}</div>
-                        </div>
-                        <div>
-                          <div className="text-slate-400 font-medium">Ngày đặt đơn</div>
-                          <div className="font-semibold text-slate-800 mt-0.5">{selectedInboxItem.data.orderDate}</div>
-                        </div>
-                      </div>
-
-                      <div>
-                        <div className="text-slate-400 font-medium">Lưu ý nghiệp vụ</div>
-                        <p className="text-slate-600 bg-white p-2.5 rounded-lg border border-slate-100 mt-1 italic">
-                          "{selectedInboxItem.data.notes || "Không có ghi chú"}"
-                        </p>
-                      </div>
-
-                      <div>
-                        <div className="text-slate-400 font-medium mb-1.5">Chi tiết sản phẩm đặt mua</div>
-                        <div className="bg-white border border-slate-100 rounded-lg overflow-hidden">
-                          <table className="w-full text-left border-collapse">
-                            <thead>
-                              <tr className="bg-slate-50 border-b border-slate-100 text-[10px] text-slate-400 font-bold">
-                                <th className="p-2">Sản phẩm</th>
-                                <th className="p-2 text-right">SL</th>
-                                <th className="p-2 text-right">Đơn giá</th>
-                                <th className="p-2 text-right">Thành tiền</th>
-                              </tr>
-                            </thead>
-                            <tbody>
-                              {selectedInboxItem.data.items.map((line: any, i: number) => (
-                                <tr key={i} className="border-b border-slate-50 last:border-0 text-[11px]">
-                                  <td className="p-2 font-medium text-slate-700">{line.productName}</td>
-                                  <td className="p-2 text-right font-mono">{line.quantity}</td>
-                                  <td className="p-2 text-right font-mono">{formatMoney(line.price)}</td>
-                                  <td className="p-2 text-right font-mono font-semibold">{formatMoney(line.subtotal)}</td>
-                                </tr>
-                              ))}
-                            </tbody>
-                          </table>
-                        </div>
-                      </div>
-
-                      <div className="flex justify-between items-center bg-amber-50 border border-amber-100 p-3 rounded-lg mt-3 text-amber-900 font-medium text-xs">
-                        <span className="flex items-center">
-                          <AlertCircle className="w-4 h-4 mr-1.5 text-amber-600 shrink-0" />
-                          Yêu cầu duyệt vượt hạn mức (Ngưỡng quy định: 50M)
-                        </span>
-                        <span className="font-bold font-mono text-slate-900">{formatMoney(selectedInboxItem.data.totalAmount)}</span>
-                      </div>
+                  <div className="space-y-4 text-xs">
+                    <div className="p-4 bg-white rounded-xl border border-slate-100">
+                      <h5 className="font-bold text-slate-800 text-sm mb-2">{selectedInboxItem.data.title}</h5>
+                      <p className="text-slate-600 leading-relaxed whitespace-pre-wrap">{selectedInboxItem.data.message}</p>
                     </div>
-                  )}
-
-                  {selectedInboxItem.type === "CONTRACT" && (
-                    <div className="space-y-3 text-xs">
-                      <div className="grid grid-cols-2 gap-4">
-                        <div>
-                          <div className="text-slate-400 font-medium">Nhân sự thụ hưởng</div>
-                          <div className="font-semibold text-slate-800 mt-0.5">{selectedInboxItem.data.employeeName}</div>
-                        </div>
-                        <div>
-                          <div className="text-slate-400 font-medium">Loại hợp đồng</div>
-                          <div className="font-semibold text-slate-800 mt-0.5">{selectedInboxItem.data.type}</div>
-                        </div>
+                    {selectedInboxItem.data.createdAt && (
+                      <div className="flex justify-between items-center text-slate-400">
+                        <span>Thời gian tạo:</span>
+                        <span className="font-mono">{new Date(selectedInboxItem.data.createdAt).toLocaleString("vi-VN")}</span>
                       </div>
-
-                      <div className="grid grid-cols-2 gap-4">
-                        <div>
-                          <div className="text-slate-400 font-medium">Ngày hiệu lực</div>
-                          <div className="font-semibold text-slate-800 mt-0.5">{selectedInboxItem.data.startDate}</div>
-                        </div>
-                        <div>
-                          <div className="text-slate-400 font-medium">Ngày hết hạn</div>
-                          <div className="font-semibold text-slate-800 mt-0.5">{selectedInboxItem.data.endDate}</div>
-                        </div>
-                      </div>
-
-                      <div className="bg-slate-100/50 p-3 rounded-lg border border-slate-200/50 flex justify-between items-center mt-2">
-                        <div>
-                          <span className="text-slate-400 block text-[10px] uppercase font-bold">Lương cơ bản thoả thuận</span>
-                          <span className="text-sm font-bold text-slate-teal font-mono">{formatMoney(selectedInboxItem.data.basicSalary)} / tháng</span>
-                        </div>
-                        {selectedInboxItem.data.attachmentName && (
-                          <div className="text-right">
-                            <span className="text-[10px] text-slate-400 block font-medium">File đính kèm:</span>
-                            <span className="text-xs text-slate-600 font-semibold underline cursor-pointer">{selectedInboxItem.data.attachmentName}</span>
-                          </div>
-                        )}
-                      </div>
-                    </div>
-                  )}
-
-                  {selectedInboxItem.type === "LEAVE" && (
-                    <div className="space-y-4 text-xs">
-                      <div className="grid grid-cols-2 gap-4">
-                        <div>
-                          <div className="text-slate-400 font-medium">Công nhân xin nghỉ</div>
-                          <div className="font-semibold text-slate-800 mt-0.5">{selectedInboxItem.data.employeeName}</div>
-                        </div>
-                        <div>
-                          <div className="text-slate-400 font-medium">Ngày gửi đơn</div>
-                          <div className="font-semibold text-slate-800 mt-0.5">{selectedInboxItem.data.createdAt ? selectedInboxItem.data.createdAt.split('T')[0] : "Hôm nay"}</div>
-                        </div>
-                      </div>
-
-                      <div className="grid grid-cols-2 gap-4">
-                        <div>
-                          <div className="text-slate-400 font-medium">Từ ngày</div>
-                          <div className="font-semibold text-slate-800 mt-0.5">{selectedInboxItem.data.startDate}</div>
-                        </div>
-                        <div>
-                          <div className="text-slate-400 font-medium">Đến hết ngày</div>
-                          <div className="font-semibold text-slate-800 mt-0.5">{selectedInboxItem.data.endDate}</div>
-                        </div>
-                      </div>
-
-                      <div>
-                        <div className="text-slate-400 font-medium">Lý do nghỉ phép</div>
-                        <p className="text-slate-700 bg-white p-3 rounded-lg border border-slate-100 mt-1 italic leading-relaxed">
-                          "{selectedInboxItem.data.reason}"
-                        </p>
-                      </div>
-                    </div>
-                  )}
+                    )}
+                  </div>
 
                   {/* Actions buttons and inline Rejection input */}
                   {showRejectForm ? (
@@ -1104,7 +1036,7 @@ export default function DashboardScreen({
                     <div className="flex items-center space-x-3 border-t border-slate-100 pt-4">
                       {/* Approved Button */}
                       <button
-                        onClick={() => handleApprove(selectedInboxItem as any)}
+                        onClick={handleApproveClick}
                         className="flex-1 flex items-center justify-center space-x-1.5 py-2.5 rounded-xl bg-slate-teal hover:bg-slate-teal-hover text-white font-semibold text-xs shadow-sm transition-all duration-200 hover:shadow"
                       >
                         <Check className="w-4 h-4" />
@@ -1132,6 +1064,35 @@ export default function DashboardScreen({
           </div>
         )}
       </div>
+
+      {/* Confirmation Modal */}
+      {showConfirmApprove && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/20 backdrop-blur-[2px] animate-in fade-in duration-200" onClick={() => setShowConfirmApprove(false)}>
+          <div className="bg-white rounded-[24px] p-6 max-w-sm w-full shadow-2xl animate-in zoom-in-95 duration-200" onClick={e => e.stopPropagation()}>
+            <div className="w-12 h-12 bg-slate-teal-light text-slate-teal rounded-full flex items-center justify-center mx-auto mb-3">
+              <Check className="w-6 h-6" />
+            </div>
+            <h3 className="text-lg font-bold text-center text-slate-800 mb-2">Xác nhận phê duyệt</h3>
+            <p className="text-xs text-center text-slate-600 mb-5 leading-relaxed">
+              Bạn đang chuẩn bị ký số và phê duyệt <strong>{selectedInboxItem?.data.title || "chứng từ này"}</strong>. Hệ thống sẽ ghi nhận quyết định của bạn.
+            </p>
+            <div className="flex space-x-3">
+              <button
+                onClick={() => setShowConfirmApprove(false)}
+                className="flex-1 py-2.5 rounded-xl border border-slate-200 text-slate-600 font-bold hover:bg-slate-50 transition-colors text-xs"
+              >
+                Hủy bỏ
+              </button>
+              <button
+                onClick={handleConfirmApprove}
+                className="flex-1 py-2.5 rounded-xl bg-slate-teal hover:bg-slate-teal-hover text-white font-bold transition-colors shadow-lg shadow-slate-teal/30 text-xs"
+              >
+                Xác nhận Duyệt
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

@@ -193,11 +193,10 @@ public class AdminTenantController {
     }
 
     /**
-     * API Lấy cấu hình phê duyệt của doanh nghiệp.
-     * Chỉ Admin Doanh nghiệp mới có quyền gọi API này.
+     * API Lấy cấu hình phê duyệt của doanh nghiệp (BOD & Admin DN).
      */
     @GetMapping("/approval-settings")
-    @PreAuthorize("hasRole('ADMIN_DN')")
+    @PreAuthorize("hasAnyRole('ADMIN_DN', 'BOD', 'DIRECTOR')")
     public ResponseEntity<ApiResponse<List<ApprovalSetting>>> getApprovalSettings() {
         List<ApprovalSetting> settings = adminTenantService.getApprovalSettings();
         return ResponseEntity.ok(
@@ -206,11 +205,10 @@ public class AdminTenantController {
     }
 
     /**
-     * API Cập nhật hàng loạt cấu hình phê duyệt cho doanh nghiệp.
-     * Chỉ Admin Doanh nghiệp mới có quyền gọi API này.
+     * API Cập nhật hàng loạt cấu hình phê duyệt cho doanh nghiệp (BOD & Admin DN).
      */
     @PutMapping("/approval-settings")
-    @PreAuthorize("hasRole('ADMIN_DN')")
+    @PreAuthorize("hasAnyRole('ADMIN_DN', 'BOD', 'DIRECTOR')")
     public ResponseEntity<ApiResponse<List<ApprovalSetting>>> updateApprovalSettings(
             @Valid @RequestBody List<ApprovalSettingDto> dtos
     ) {

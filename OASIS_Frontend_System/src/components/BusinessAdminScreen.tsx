@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useContext } from "react";
 import {
   Users, UserCheck, ShieldAlert, Layers, Search, Plus,
   Trash2, Edit, CheckCircle2, AlertCircle, Shield, X,
@@ -25,20 +25,22 @@ import {
   deleteTenantPositionApi
 } from "../api";
 import { Tenant, User as UserType } from "../types";
+import { AuthContext } from "../context/AuthContext";
+import { TenantContext } from "../context/TenantContext";
 
 interface BusinessAdminScreenProps {
-  currentTenant: Tenant;
-  currentUser: UserType;
   activeTab: string;
   selectedDepartmentId?: string | number | null;
 }
 
 export default function BusinessAdminScreen({
-  currentTenant,
-  currentUser,
   activeTab,
   selectedDepartmentId = null
 }: BusinessAdminScreenProps) {
+  const authCtx = useContext(AuthContext);
+  const tenantCtx = useContext(TenantContext);
+  const currentUser = authCtx?.currentUser as UserType | null;
+  const currentTenant = (tenantCtx?.currentTenant ?? { id: "", name: "", industry: "", subdomain: "", logo: "", taxCode: "" }) as Tenant;
   // Tình trạng tải và thông tin chung
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -1257,21 +1259,21 @@ export default function BusinessAdminScreen({
                                 {/* Lock/Unlock */}
                                 <button
                                   onClick={() => {
-                                    if (emp.user && emp.user.email === currentUser.email) {
+                                    if (emp.user && emp.user.email === currentUser?.email) {
                                       alert("Bạn không thể tự khóa tài khoản của chính mình!");
                                       return;
                                     }
                                     handleOpenStatusModal(emp);
                                   }}
-                                  disabled={!emp.user || (emp.user && emp.user.email === currentUser.email)}
-                                  className={`p-1.5 rounded-lg transition-colors ${(!emp.user || (emp.user && emp.user.email === currentUser.email))
+                                  disabled={!emp.user || (emp.user && emp.user.email === currentUser?.email)}
+                                  className={`p-1.5 rounded-lg transition-colors ${(!emp.user || (emp.user && emp.user.email === currentUser?.email))
                                       ? "text-slate-200 cursor-not-allowed"
                                       : "text-slate-500 hover:bg-slate-100 hover:text-rose-600 cursor-pointer"
                                     }`}
                                   title={
                                     !emp.user
                                       ? "Không có tài khoản"
-                                      : emp.user.email === currentUser.email
+                                      : emp.user.email === currentUser?.email
                                         ? "Bạn không thể tự khóa tài khoản của chính mình"
                                         : emp.user.isActive
                                           ? "Tạm khóa tài khoản Web"

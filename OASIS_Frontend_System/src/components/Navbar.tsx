@@ -1,6 +1,8 @@
-import { useState, startTransition } from "react";
+import { useState } from "react";
+import { useNavigate } from "react-router-dom";
 import { Tenant, User as UserType } from "../types";
 import { Search, Bell, ChevronDown, CheckCircle2, AlertTriangle, FileText, Calendar, LogOut, ShieldAlert } from "lucide-react";
+import { ROUTES } from "../router/routeConfig";
 
 interface NavbarProps {
   currentTenant: Tenant;
@@ -10,13 +12,13 @@ interface NavbarProps {
   pendingOrders: number;
   pendingContracts: number;
   pendingLeaves: number;
-  onNavigateToTab: (tabId: string) => void;
   currentUser: UserType;
   onLogout: () => void;
   liveNotifications?: any[];
   liveUnreadCount?: number;
   onMarkNotificationRead?: (id: number) => void;
   onMarkAllNotificationsRead?: () => void;
+  onSelectNotificationTarget?: (id: number) => void;
 }
 
 export default function Navbar({
@@ -27,14 +29,15 @@ export default function Navbar({
   pendingOrders,
   pendingContracts,
   pendingLeaves,
-  onNavigateToTab,
   currentUser,
   onLogout,
   liveNotifications = [],
   liveUnreadCount = 0,
   onMarkNotificationRead,
-  onMarkAllNotificationsRead
+  onMarkAllNotificationsRead,
+  onSelectNotificationTarget
 }: NavbarProps) {
+  const navigate = useNavigate();
   const [showNotifDropdown, setShowNotifDropdown] = useState(false);
   const [showUserDropdown, setShowUserDropdown] = useState(false);
   const [showLogoutConfirm, setShowLogoutConfirm] = useState(false);
@@ -49,13 +52,15 @@ export default function Navbar({
   // Phân quyền nội dung thông báo
   const cleanRole = currentUser ? currentUser.role.toUpperCase() : "";
   const isSuperAdmin = cleanRole === "SUPER_ADMIN" || cleanRole.includes("SUPER_ADMIN") || cleanRole.includes("TOÀN BỘ HỆ THỐNG SAAS") || cleanRole.includes("QUẢN TRỊ HỆ THỐNG");
-  const isBOD = cleanRole === "BOD / OWNER" || cleanRole === "DIRECTOR" || cleanRole === "ADMIN_DN";
+  // Sử dụng chung 1 logic kiểm tra BOD như App.tsx để tránh lỗi bất đồng bộ khi kiểm tra quyền
+  const isBOD = cleanRole === "BOD / OWNER" || cleanRole === "DIRECTOR" || cleanRole === "ADMIN_DN" || cleanRole.includes("CHỦ DOANH NGHIỆP") || cleanRole.includes("GIÁM ĐỐC") || cleanRole.includes("BOD");
 
   // Lấy chi tiết icon và giao diện của thông báo real-time
   const getNotifDetails = (type: string, isRead: boolean) => {
     if (isRead) {
       return {
         bg: "bg-slate-50/50 border-slate-100/60 opacity-60",
+        hoverBg: "hover:bg-slate-100/50",
         text: "text-slate-400",
         icon: FileText
       };
@@ -64,6 +69,7 @@ export default function Navbar({
     if (t === "ORDER") {
       return {
         bg: "bg-amber-50/85 border-amber-100/70",
+        hoverBg: "hover:bg-amber-100/80",
         text: "text-amber-700",
         icon: AlertTriangle
       };
@@ -71,18 +77,22 @@ export default function Navbar({
     if (t === "CONTRACT") {
       return {
         bg: "bg-sky-50/85 border-sky-100/70",
+        hoverBg: "hover:bg-sky-100/80",
         text: "text-sky-700",
         icon: FileText
       };
     }
     return {
       bg: "bg-rose-50/85 border-rose-100/70",
+      hoverBg: "hover:bg-rose-100/80",
       text: "text-rose-700",
       icon: Calendar
     };
   };
 
-  const notificationsCount = isBOD ? liveUnreadCount : (isSuperAdmin ? 2 : 0);
+  const filteredLiveNotifications = liveNotifications.filter((n: any) => (!n.targetRole || n.targetRole === "BOD") && n.type !== "ACCOUNTANT_EXPLANATION");
+  const liveUnreadCountFiltered = filteredLiveNotifications.filter((n: any) => !n.isRead).length;
+  const notificationsCount = isBOD ? liveUnreadCountFiltered : (isSuperAdmin ? 2 : 0);
 
   // Chọn ảnh chân dung thực tế dựa trên vai trò
   const avatarUrl = isSuperAdmin
@@ -154,7 +164,7 @@ export default function Navbar({
                 <span className="text-xs font-bold text-slate-800">
                   {isSuperAdmin ? "Cảnh báo hệ thống" : "Hộp thư thông báo"} ({notificationsCount})
                 </span>
-                {isBOD && liveUnreadCount > 0 && onMarkAllNotificationsRead && (
+                {isBOD && liveUnreadCountFiltered > 0 && onMarkAllNotificationsRead && (
                   <button
                     onClick={(e) => {
                       e.stopPropagation();
@@ -176,22 +186,23 @@ export default function Navbar({
                 ) : (
                   <div className="px-2 space-y-1.5">
                     {/* Render notifications for BOD (Live) */}
-                    {isBOD && liveNotifications.map((notif: any) => {
+                    {isBOD && [...filteredLiveNotifications].sort((a, b) => Number(a.isRead) - Number(b.isRead)).map((notif: any) => {
                       const details = getNotifDetails(notif.type, notif.isRead);
                       const IconComp = details.icon;
                       return (
                         <div
                           key={notif.id}
                           onClick={() => {
-                            if (!notif.isRead && onMarkNotificationRead) {
-                              onMarkNotificationRead(notif.id);
+                            if (onSelectNotificationTarget) {
+                              onSelectNotificationTarget(notif.id);
                             }
-                            startTransition(() => {
-                              onNavigateToTab("dashboard");
-                            });
+                            navigate(ROUTES.BOD_DASHBOARD);
                             setShowNotifDropdown(false);
+                            setTimeout(() => {
+                              document.getElementById('quick-approval-inbox-section')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+                            }, 150);
                           }}
-                          className={`p-3 rounded-2xl border flex items-start space-x-3 transition-all hover:bg-slate-50 cursor-pointer ${details.bg}`}
+                          className={`p-3 rounded-2xl border flex items-start space-x-3 transition-all cursor-pointer ${details.bg} ${details.hoverBg}`}
                         >
                           <div className={`p-1.5 rounded-xl bg-white shadow-xs shrink-0 ${details.text}`}>
                             <IconComp className="w-4 h-4" />
@@ -263,10 +274,11 @@ export default function Navbar({
                 <div className="px-4 pt-2 mt-2 border-t border-slate-100 text-center">
                   <button
                     onClick={() => {
-                      startTransition(() => {
-                        onNavigateToTab("dashboard");
-                      });
+                      navigate(ROUTES.BOD_DASHBOARD);
                       setShowNotifDropdown(false);
+                      setTimeout(() => {
+                        document.getElementById('quick-approval-inbox-section')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+                      }, 150);
                     }}
                     className="text-[10px] text-slate-teal font-bold hover:underline bg-transparent border-0 cursor-pointer"
                   >

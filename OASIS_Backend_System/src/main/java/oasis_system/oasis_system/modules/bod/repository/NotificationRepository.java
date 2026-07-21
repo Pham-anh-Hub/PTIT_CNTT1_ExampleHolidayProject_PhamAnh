@@ -18,7 +18,17 @@ public interface NotificationRepository extends JpaRepository<Notification, Long
     List<Notification> findByCompanyIdOrderByCreatedAtDesc(Long companyId);
 
     /**
+     * Lấy danh sách thông báo theo vai trò đích (hoặc null/rỗng cho BOD).
+     */
+    List<Notification> findByCompanyIdAndTargetRoleInOrderByCreatedAtDesc(Long companyId, List<String> targetRoles);
+
+    /**
      * Đếm số lượng thông báo chưa đọc của doanh nghiệp.
      */
     long countByCompanyIdAndIsReadFalse(Long companyId);
+
+    /**
+     * Đếm số thông báo chưa đọc theo vai trò đích.
+     */
+    long countByCompanyIdAndTargetRoleInAndIsReadFalse(Long companyId, List<String> targetRoles);
 }

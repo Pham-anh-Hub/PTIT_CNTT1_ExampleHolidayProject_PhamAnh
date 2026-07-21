@@ -56,4 +56,9 @@ public interface EmployeeRepository extends JpaRepository<Employee, Long> {
      * Kiểm tra xem có bất kỳ nhân viên nào đang có chức vụ này không.
      */
     boolean existsByPositionId(Long positionId);
+
+    /**
+     * Tìm hồ sơ nhân viên dựa trên user_id của tài khoản đăng nhập.
+     */
+    Optional<Employee> findByUserId(Long userId);
 }

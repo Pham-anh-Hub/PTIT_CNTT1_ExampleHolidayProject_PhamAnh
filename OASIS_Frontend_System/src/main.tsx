@@ -1,6 +1,10 @@
 import { StrictMode } from "react";
 import { createRoot } from "react-dom/client";
+import { BrowserRouter } from "react-router-dom";
 import App from "./App.tsx";
+import { AuthProvider } from "./context/AuthContext.tsx";
+import { TenantProvider } from "./context/TenantContext.tsx";
+import { DataProvider } from "./context/DataContext.tsx";
 import "../index.css";
 
 const rootElement = document.getElementById("root");
@@ -10,6 +14,14 @@ if (!rootElement) {
 
 createRoot(rootElement).render(
   <StrictMode>
-    <App />
+    <BrowserRouter>
+      <AuthProvider>
+        <TenantProvider>
+          <DataProvider>
+            <App />
+          </DataProvider>
+        </TenantProvider>
+      </AuthProvider>
+    </BrowserRouter>
   </StrictMode>
 );

@@ -15,8 +15,9 @@ public class NotificationPayload {
     private Long id; // ID lưu trữ trong database
     private String title;
     private String message;
-    private String type; // ORDER, CONTRACT, PROD_PLAN
+    private String type; // ORDER, CONTRACT, PROD_PLAN, ACCOUNTANT_EXPLANATION
     private Long referenceId;
+    private String targetRole; // E.g., "BOD", "ACCOUNTANT", "HR", "SALES"
     @Builder.Default
     private LocalDateTime timestamp = LocalDateTime.now();
 }

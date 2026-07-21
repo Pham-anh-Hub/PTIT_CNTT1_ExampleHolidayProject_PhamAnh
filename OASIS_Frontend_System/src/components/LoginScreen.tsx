@@ -98,12 +98,19 @@ export default function LoginScreen({ onLoginSuccess }: LoginScreenProps) {
 
         localStorage.setItem("saas_token", token);
 
+        // Xác định vai trò từ dữ liệu backend (fallback về roleName)
+        let role = activeContext?.roleName || "USER";
+        // Nếu roleName từ API trả về là BOD / OWNER hoặc DIRECTOR thì Frontend map sang BOD để hiển thị Dashboard
+        if (role.toUpperCase().includes("BOD") || role.toUpperCase().includes("GIÁM ĐỐC") || role.toUpperCase().includes("DIRECTOR") || role === "BOD / OWNER" || role === "DIRECTOR") {
+          role = "BOD / OWNER";
+        }
+
         // Tạo đối tượng User cho Frontend
         const frontendUser: UserType = {
           id: info.id.toString(),
           username: info.email,
           fullname: info.fullname,
-          role: activeContext ? activeContext.roleName : "SUPER_ADMIN",
+          role: role,
           email: info.email,
           tenantId: activeContext && activeContext.roleId ? `tenant-${activeContext.roleId}` : "tenant-system",
           avatar: info.fullname.split(" ").pop()?.charAt(0) || "U"
@@ -212,19 +219,25 @@ export default function LoginScreen({ onLoginSuccess }: LoginScreenProps) {
                       try {
                         const response = await selectContextApi(email, context.roleId, context.departmentId);
                         const token = response.data.accessToken;
-                        const info = response.data.userInfo;
+                        const userInfo = response.data.userInfo;
                         const active = response.data.activeContext;
 
                         localStorage.setItem("saas_token", token);
 
+                        // Xác định vai trò từ dữ liệu backend (fallback về roleName)
+                        let role = active?.roleName || "USER";
+                        if (role.toUpperCase().includes("BOD") || role.toUpperCase().includes("GIÁM ĐỐC") || role.toUpperCase().includes("DIRECTOR") || role === "BOD / OWNER" || role === "DIRECTOR") {
+                          role = "BOD / OWNER";
+                        }
+
                         const frontendUser: UserType = {
-                          id: info.id.toString(),
-                          username: info.email,
-                          fullname: info.fullname,
-                          role: active ? active.roleName : "SUPER_ADMIN",
-                          email: info.email,
+                          id: userInfo.id.toString(),
+                          username: userInfo.email,
+                          fullname: userInfo.fullname,
+                          role: role,
+                          email: userInfo.email,
                           tenantId: active && active.roleId ? `tenant-${active.roleId}` : "tenant-system",
-                          avatar: info.fullname.split(" ").pop()?.charAt(0) || "U"
+                          avatar: userInfo.fullname.split(" ").pop()?.charAt(0) || "U"
                         };
 
                         onLoginSuccess(frontendUser);

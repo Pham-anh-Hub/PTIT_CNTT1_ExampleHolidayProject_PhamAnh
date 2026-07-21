@@ -1,4 +1,5 @@
 import { useState, useEffect } from "react";
+import { useNavigate } from "react-router-dom";
 import { motion, AnimatePresence } from "motion/react";
 import { Shield, Plus, Building, User, Mail, Lock, CheckCircle2, AlertCircle, TrendingUp, Cpu, CreditCard, Activity, X, Globe, UserCheck, ShieldAlert } from "lucide-react";
 import { registerCompanyApi, getCompaniesApi } from "../api";
@@ -17,11 +18,8 @@ const getCompanyLogoUrl = (logoText?: string) => {
   return "https://images.unsplash.com/photo-1620121692029-d088224ddc74?w=80&auto=format&fit=crop&q=80"; // Fallback logo placeholder
 };
 
-interface SysAdminScreenProps {
-  onViewTenantDetail: (tenant: any) => void;
-}
-
-export default function SysAdminScreen({ onViewTenantDetail }: SysAdminScreenProps) {
+export default function SysAdminScreen() {
+  const navigate = useNavigate();
   const [tenants, setTenants] = useState<any[]>([]);
 
   // Fetch companies từ Backend khi component mount
@@ -343,7 +341,7 @@ export default function SysAdminScreen({ onViewTenantDetail }: SysAdminScreenPro
                     />
                     <div className="text-left">
                       <button
-                        onClick={() => onViewTenantDetail(tenant)}
+                        onClick={() => navigate(`/sys-admin/tenant/${tenant.id}`)}
                         className="font-bold text-slate-800 hover:text-slate-teal hover:underline transition-colors block text-left cursor-pointer"
                         style={{ fontFamily: "'Poppins', sans-serif" }}
                       >

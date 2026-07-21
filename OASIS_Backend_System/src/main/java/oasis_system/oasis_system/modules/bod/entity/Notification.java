@@ -39,6 +39,9 @@ public class Notification {
     @Column(name = "reference_id")
     private Long referenceId;
 
+    @Column(name = "target_role", length = 50)
+    private String targetRole; // E.g., "BOD", "ACCOUNTANT", "HR", "SALES"
+
     @Column(name = "is_read", nullable = false)
     @Builder.Default
     private Boolean isRead = false;

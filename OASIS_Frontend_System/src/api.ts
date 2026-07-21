@@ -1,5 +1,22 @@
 export const API_BASE_URL = "http://localhost:8080";
 
+// Ghi đè fetch toàn cục để bắt lỗi 401 Unauthorized (hết hạn token)
+const originalFetch = window.fetch;
+window.fetch = async (input, init) => {
+  const res = await originalFetch(input, init);
+  if (res.status === 401) {
+    const urlString = typeof input === "string" 
+      ? input 
+      : (input instanceof Request ? input.url : input.toString());
+    
+    // Bỏ qua các API phục vụ đăng nhập
+    if (!urlString.includes("/api/v1/auth/login") && !urlString.includes("/api/v1/auth/select-context")) {
+      window.dispatchEvent(new CustomEvent("session-expired"));
+    }
+  }
+  return res;
+};
+
 export const getAuthHeader = (): Record<string, string> => {
   const token = localStorage.getItem("saas_token");
   return token ? { "Authorization": `Bearer ${token}` } : {};
@@ -557,6 +574,7 @@ export async function simulateBodNotificationApi(payload: {
   message: string;
   type: string;
   referenceId?: number;
+  targetRole?: string;
 }) {
   const res = await fetch(`${API_BASE_URL}/api/v1/bod/dashboard/simulate-notification`, {
     method: "POST",
@@ -627,4 +645,276 @@ export async function markAllBodNotificationsReadApi() {
     throw new Error(json.message || "Không thể đánh dấu đã đọc tất cả");
   }
   return json;
+}
+
+// ==========================================
+// API DÀNH CHO BOD HRM (GIÁM ĐỐC)
+// ==========================================
+
+export async function getBodPendingContractsApi() {
+  const res = await fetch(`${API_BASE_URL}/api/v1/bod/hrm/contracts/pending`, {
+    method: "GET",
+    headers: getAuthHeader(),
+  });
+  return res.json();
+}
+
+export async function approveBodContractApi(id: number) {
+  const res = await fetch(`${API_BASE_URL}/api/v1/bod/hrm/contracts/${id}/approve`, {
+    method: "PUT",
+    headers: getAuthHeader(),
+  });
+  return res.json();
+}
+
+export async function rejectBodContractApi(id: number, reason: string) {
+  const res = await fetch(`${API_BASE_URL}/api/v1/bod/hrm/contracts/${id}/reject`, {
+    method: "PUT",
+    headers: {
+      ...getAuthHeader(),
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({ reason }),
+  });
+  return res.json();
+}
+
+export async function getBodPayrollsApi() {
+  const res = await fetch(`${API_BASE_URL}/api/v1/bod/hrm/payrolls`, {
+    method: "GET",
+    headers: getAuthHeader(),
+  });
+  return res.json();
+}
+
+export async function approveBodPayrollApi(period: string) {
+  const res = await fetch(`${API_BASE_URL}/api/v1/bod/hrm/payrolls/${period}/approve`, {
+    method: "PUT",
+    headers: getAuthHeader(),
+  });
+  return res.json();
+}
+
+export async function payBodPayrollApi(period: string) {
+  const res = await fetch(`${API_BASE_URL}/api/v1/bod/hrm/payrolls/${period}/pay`, {
+    method: "PUT",
+    headers: getAuthHeader(),
+  });
+  return res.json();
+}
+
+export async function getBodHrmAnalyticsApi() {
+  const res = await fetch(`${API_BASE_URL}/api/v1/bod/hrm/analytics`, {
+    method: "GET",
+    headers: getAuthHeader(),
+  });
+  return res.json();
+}
+
+export async function getBodPendingLeavesApi() {
+  const res = await fetch(`${API_BASE_URL}/api/v1/bod/hrm/leaves/pending`, {
+    method: "GET",
+    headers: getAuthHeader(),
+  });
+  return res.json();
+}
+
+export async function approveBodLeaveApi(id: number) {
+  const res = await fetch(`${API_BASE_URL}/api/v1/bod/hrm/leaves/${id}/approve`, {
+    method: "PUT",
+    headers: getAuthHeader(),
+  });
+  return res.json();
+}
+
+export async function rejectBodLeaveApi(id: number, reason: string) {
+  const res = await fetch(`${API_BASE_URL}/api/v1/bod/hrm/leaves/${id}/reject`, {
+    method: "PUT",
+    headers: {
+      ...getAuthHeader(),
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({ reason }),
+  });
+  return res.json();
+}
+
+export async function getBodApprovalLogsApi() {
+  const res = await fetch(`${API_BASE_URL}/api/v1/bod/hrm/approval-logs`, {
+    method: "GET",
+    headers: getAuthHeader(),
+  });
+  return res.json();
+}
+
+// ==========================================
+// API DÀNH CHO BOD SALES (GIÁM ĐỐC)
+// ==========================================
+
+export async function getBodPendingOrdersApi() {
+  const res = await fetch(`${API_BASE_URL}/api/v1/bod/sales/orders/pending`, {
+    method: "GET",
+    headers: getAuthHeader(),
+  });
+  return res.json();
+}
+
+export async function approveBodOrderApi(id: number) {
+  const res = await fetch(`${API_BASE_URL}/api/v1/bod/sales/orders/${id}/approve`, {
+    method: "PUT",
+    headers: getAuthHeader(),
+  });
+  return res.json();
+}
+
+export async function rejectBodOrderApi(id: number, reason: string) {
+  const res = await fetch(`${API_BASE_URL}/api/v1/bod/sales/orders/${id}/reject`, {
+    method: "PUT",
+    headers: {
+      ...getAuthHeader(),
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({ reason }),
+  });
+  return res.json();
+}
+
+export async function getBodDebtAgingReportApi() {
+  const res = await fetch(`${API_BASE_URL}/api/v1/bod/sales/reports/debt-aging`, {
+    method: "GET",
+    headers: getAuthHeader(),
+  });
+  return res.json();
+}
+
+export async function getBodRevenueCashflowApi() {
+  const res = await fetch(`${API_BASE_URL}/api/v1/bod/sales/reports/revenue-cashflow`, {
+    method: "GET",
+    headers: getAuthHeader(),
+  });
+  return res.json();
+}
+
+export async function getBodTopCustomersApi() {
+  const res = await fetch(`${API_BASE_URL}/api/v1/bod/sales/reports/top-customers`, {
+    method: "GET",
+    headers: getAuthHeader(),
+  });
+  return res.json();
+}
+
+// ─── BOD Finance & Accounting APIs ───────────────────────────────────────────
+export async function getBodPendingPayrollsApi() {
+  const res = await fetch(`${API_BASE_URL}/api/v1/bod/finance/payrolls/pending`, {
+    method: "GET",
+    headers: getAuthHeader(),
+  });
+  return res.json();
+}
+
+export async function getBodPayrollAnalysisApi(period: string) {
+  const res = await fetch(`${API_BASE_URL}/api/v1/bod/finance/payrolls/${encodeURIComponent(period)}/analysis`, {
+    method: "GET",
+    headers: getAuthHeader(),
+  });
+  return res.json();
+}
+
+export async function authorizeBodPayrollApi(period: string, note?: string) {
+  const res = await fetch(`${API_BASE_URL}/api/v1/bod/finance/payrolls/${encodeURIComponent(period)}/authorize`, {
+    method: "PUT",
+    headers: {
+      ...getAuthHeader(),
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({ note: note || "" }),
+  });
+  return res.json();
+}
+
+export async function getBodFinancialHealthRadarApi() {
+  const res = await fetch(`${API_BASE_URL}/api/v1/bod/finance/health-radar`, {
+    method: "GET",
+    headers: getAuthHeader(),
+  });
+  return res.json();
+}
+
+// ─── BOD Production & Operations Module APIs ──────────────────────────────────
+export async function getBodPendingProductionPlansApi() {
+  const res = await fetch(`${API_BASE_URL}/api/v1/bod/production/plans/pending`, {
+    method: "GET",
+    headers: getAuthHeader(),
+  });
+  return res.json();
+}
+
+export async function approveBodProductionPlanApi(id: number) {
+  const res = await fetch(`${API_BASE_URL}/api/v1/bod/production/plans/${id}/approve`, {
+    method: "PUT",
+    headers: getAuthHeader(),
+  });
+  return res.json();
+}
+
+export async function rejectBodProductionPlanApi(id: number, reason: string) {
+  const res = await fetch(`${API_BASE_URL}/api/v1/bod/production/plans/${id}/reject`, {
+    method: "PUT",
+    headers: {
+      ...getAuthHeader(),
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({ reason }),
+  });
+  return res.json();
+}
+
+export async function getBodProductionProgressApi() {
+  const res = await fetch(`${API_BASE_URL}/api/v1/bod/production/progress`, {
+    method: "GET",
+    headers: getAuthHeader(),
+  });
+  return res.json();
+}
+
+export async function getBodProductionBottlenecksApi() {
+  const res = await fetch(`${API_BASE_URL}/api/v1/bod/production/bottlenecks`, {
+    method: "GET",
+    headers: getAuthHeader(),
+  });
+  return res.json();
+}
+
+// ─── BOD Settings & Audit Module APIs ─────────────────────────────────────────
+export async function getBodAuditLogsApi(params?: { module?: string; severity?: string; search?: string }) {
+  const query = new URLSearchParams();
+  if (params?.module && params.module !== 'ALL') query.append('module', params.module);
+  if (params?.severity && params.severity !== 'ALL') query.append('severity', params.severity);
+  if (params?.search) query.append('search', params.search);
+
+  const res = await fetch(`${API_BASE_URL}/api/v1/bod/settings/audit-logs?${query.toString()}`, {
+    method: "GET",
+    headers: getAuthHeader(),
+  });
+  return res.json();
+}
+
+export async function getBodThresholdsApi() {
+  const res = await fetch(`${API_BASE_URL}/api/v1/bod/settings/thresholds`, {
+    method: "GET",
+    headers: getAuthHeader(),
+  });
+  return res.json();
+}
+
+export async function updateBodThresholdsApi(dto: any) {
+  const res = await fetch(`${API_BASE_URL}/api/v1/bod/settings/thresholds`, {
+    method: "PUT",
+    headers: {
+      ...getAuthHeader(),
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify(dto),
+  });
+  return res.json();
 }
