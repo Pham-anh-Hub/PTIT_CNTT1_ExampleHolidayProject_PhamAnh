@@ -53,6 +53,28 @@ public class DataInitializer implements CommandLineRunner {
             superAdminRole = roleRepository.save(superAdminRole);
         }
 
+        // Khởi tạo các System Roles dùng chung nếu chưa có (companyId == null)
+        String[][] sysRolesToSeed = {
+            {"ACCOUNTANT", "Nhân viên phòng Kế toán"},
+            {"BOD", "Ban Giám đốc"},
+            {"ADMIN_DN", "Quản trị doanh nghiệp"},
+            {"HR_MANAGER", "Nhân viên Nhân sự"},
+            {"SALES", "Nhân viên Kinh doanh"},
+            {"PRODUCTION_STAFF", "Quản đốc / Kỹ thuật Xưởng sản xuất"},
+            {"WORKER", "Công nhân sản xuất / Lao động trực tiếp"}
+        };
+        java.util.List<Role> systemRoles = roleRepository.findByCompanyIdIsNull();
+        for (String[] rInfo : sysRolesToSeed) {
+            boolean exists = systemRoles.stream().anyMatch(r -> r.getName() != null && r.getName().equalsIgnoreCase(rInfo[0]));
+            if (!exists) {
+                roleRepository.save(Role.builder()
+                        .company(null)
+                        .name(rInfo[0])
+                        .description(rInfo[1])
+                        .build());
+            }
+        }
+
         // 3. Đảm bảo tài khoản Super Admin tồn tại và đồng bộ đúng mật khẩu
         final Company finalSystemCompany = systemCompany;
         final Role finalSuperAdminRole = superAdminRole;

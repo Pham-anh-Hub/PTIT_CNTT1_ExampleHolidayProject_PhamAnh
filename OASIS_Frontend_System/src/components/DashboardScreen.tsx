@@ -8,6 +8,7 @@ import {
   getBodCustomerDebtApi,
   simulateBodNotificationApi
 } from "../api";
+import CustomSelect from "./CustomSelect";
 
 interface DashboardScreenProps {
   orders: SalesOrder[];
@@ -852,10 +853,9 @@ export default function DashboardScreen({
           <div className="flex items-end space-x-3">
             <div className="space-y-1 flex-1">
               <label className="text-[10px] font-bold text-slate-500 block uppercase">Loại nghiệp vụ</label>
-              <select
+              <CustomSelect
                 value={simType}
-                onChange={(e) => {
-                  const val = e.target.value;
+                onChange={(val) => {
                   setSimType(val);
                   if (val === 'ORDER') {
                     setSimTitle("Đề xuất đơn hàng mới chờ duyệt");
@@ -874,14 +874,15 @@ export default function DashboardScreen({
                     setSimMessage("Sản xuất lỗi rập 40m vải Kaki - Xin duyệt cấp bù 28.000.000 VNĐ tiền vải thay thế.");
                   }
                 }}
-                className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-xs font-bold text-slate-700 focus:outline-none focus:border-slate-teal"
-              >
-                <option value="ORDER">Đơn Hàng Bán (ORDER)</option>
-                <option value="CONTRACT">Hợp Đồng Mới (CONTRACT)</option>
-                <option value="LEAVE">Nghỉ Phép (LEAVE)</option>
-                <option value="PRODUCTION_PLAN">Kế Hoạch Sản Xuất (PRODUCTION_PLAN)</option>
-                <option value="MATERIAL_EXTRA">Cấp Bù Vật Tư (MATERIAL_EXTRA)</option>
-              </select>
+                options={[
+                  { value: "ORDER", label: "Đơn Hàng Bán (ORDER)" },
+                  { value: "CONTRACT", label: "Hợp Đồng Mới (CONTRACT)" },
+                  { value: "LEAVE", label: "Nghỉ Phép (LEAVE)" },
+                  { value: "PRODUCTION_PLAN", label: "Kế Hoạch Sản Xuất (PRODUCTION_PLAN)" },
+                  { value: "MATERIAL_EXTRA", label: "Cấp Bù Vật Tư (MATERIAL_EXTRA)" },
+                ]}
+                className="w-full"
+              />
             </div>
             <button
               type="submit"

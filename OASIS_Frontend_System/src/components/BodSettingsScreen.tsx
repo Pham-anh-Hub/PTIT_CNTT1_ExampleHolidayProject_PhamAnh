@@ -10,6 +10,7 @@ import {
   getBodThresholdsApi,
   updateBodThresholdsApi
 } from '../api';
+import CustomSelect from './CustomSelect';
 
 interface BodSettingsScreenProps {
   sharedNotifications?: any[];
@@ -20,8 +21,8 @@ export default function BodSettingsScreen({
   sharedNotifications = [],
   onMarkNotificationRead
 }: BodSettingsScreenProps) {
-  // Sub-tabs: 'audit-logs' | 'thresholds' | 'notifications' | 'delegation'
-  const [activeSubTab, setActiveSubTab] = useState<"audit-logs" | "thresholds" | "notifications" | "delegation">("audit-logs");
+  // Sub-tabs: 'audit-logs' | 'thresholds'
+  const [activeSubTab, setActiveSubTab] = useState<"audit-logs" | "thresholds">("audit-logs");
 
   // State data
   const [auditLogs, setAuditLogs] = useState<any[]>([]);
@@ -32,10 +33,13 @@ export default function BodSettingsScreen({
     materialCompensationThreshold: 10000000
   });
 
-  // Filter states for Audit Logs
+  // Filter states for Audit Logs (5 dimensions: Thời gian, Người thực hiện, Hành động, Phân hệ, Nội dung & Mã chứng từ)
   const [logSearch, setLogSearch] = useState("");
+  const [logActorFilter, setLogActorFilter] = useState("");
+  const [logActionFilter, setLogActionFilter] = useState("ALL");
   const [logModuleFilter, setLogModuleFilter] = useState("ALL");
   const [logSeverityFilter, setLogSeverityFilter] = useState("ALL");
+  const [logDateFilter, setLogDateFilter] = useState("");
 
   // Loading & Toast states
   const [isLoading, setIsLoading] = useState(true);
@@ -44,19 +48,6 @@ export default function BodSettingsScreen({
 
   // Selected Log detail modal
   const [selectedLog, setSelectedLog] = useState<any | null>(null);
-
-  // Notification Preference states
-  const [pushEnabled, setPushEnabled] = useState(true);
-  const [digestEnabled, setDigestEnabled] = useState(true);
-  const [emailAlertsEnabled, setEmailAlertsEnabled] = useState(true);
-  const [telegramAlertsEnabled, setTelegramAlertsEnabled] = useState(false);
-
-  // Delegation Form states
-  const [delegationActive, setDelegationActive] = useState(false);
-  const [delegateeName, setDelegateeName] = useState("Trần Quốc Bảo (Phó Giám Đốc)");
-  const [delegatedFromDate, setDelegatedFromDate] = useState("2026-07-22");
-  const [delegatedToDate, setDelegatedToDate] = useState("2026-07-30");
-  const [delegationScope, setDelegationScope] = useState<string[]>(["CONTRACT", "PRODUCTION_PLAN"]);
 
   const formatMoney = (amount: number) => {
     return new Intl.NumberFormat("vi-VN", { style: "currency", currency: "VND" }).format(amount || 0);
@@ -75,8 +66,8 @@ export default function BodSettingsScreen({
         getBodThresholdsApi().catch(() => ({ data: null }))
       ]);
 
-      // Fallback Audit Logs data
-      setAuditLogs(logsRes.data || [
+      // Fallback Audit Logs data (Dữ liệu thử nghiệm phong phú cho bộ lọc 5 chiều)
+      setAuditLogs((logsRes.data && logsRes.data.length > 0) ? logsRes.data : [
         {
           id: 1,
           createdAt: "2026-07-21 09:15:22",
@@ -105,6 +96,19 @@ export default function BodSettingsScreen({
         },
         {
           id: 3,
+          createdAt: "2026-07-21 07:30:00",
+          actorName: "Trần Thị Mai (Trưởng phòng Nhân sự)",
+          actorRole: "HR MANAGER",
+          ipAddress: "118.70.124.15",
+          action: "Phê duyệt",
+          actionType: "APPROVE",
+          module: "Nhân sự",
+          documentRef: "HD-2026-105",
+          details: "Ký hợp đồng lao động chính thức 2 năm cho Nhân viên Thiết kế Nguyễn Hoàng Long.",
+          severity: "INFO"
+        },
+        {
+          id: 4,
           createdAt: "2026-07-20 16:30:45",
           actorName: "Nguyễn Văn Hùng (Kế toán trưởng)",
           actorRole: "ACCOUNTANT",
@@ -117,7 +121,7 @@ export default function BodSettingsScreen({
           severity: "CRITICAL"
         },
         {
-          id: 4,
+          id: 5,
           createdAt: "2026-07-20 14:12:05",
           actorName: "Phạm Anh (Giám đốc)",
           actorRole: "BOD / DIRECTOR",
@@ -130,7 +134,33 @@ export default function BodSettingsScreen({
           severity: "WARNING"
         },
         {
-          id: 5,
+          id: 6,
+          createdAt: "2026-07-20 10:15:30",
+          actorName: "Hoàng Quốc Bảo (Nhân viên Sales)",
+          actorRole: "SALES STAFF",
+          ipAddress: "27.72.105.44",
+          action: "Đề xuất",
+          actionType: "SUBMIT",
+          module: "Kinh doanh",
+          documentRef: "DH-SALE-995",
+          details: "Lập đề xuất đơn hàng 120.000.000 VNĐ cho Tập đoàn Dệt may Hòa Phát.",
+          severity: "INFO"
+        },
+        {
+          id: 7,
+          createdAt: "2026-07-19 15:45:12",
+          actorName: "Phạm Anh (Giám đốc)",
+          actorRole: "BOD / DIRECTOR",
+          ipAddress: "118.70.124.89",
+          action: "Phê duyệt",
+          actionType: "APPROVE",
+          module: "Tài chính",
+          documentRef: "UNT-2026-44",
+          details: "Ký duyệt ủy nhiệm chi thanh toán hợp đồng thuê xưởng tháng 7 trị giá 90.000.000 VNĐ.",
+          severity: "INFO"
+        },
+        {
+          id: 8,
           createdAt: "2026-07-19 11:05:00",
           actorName: "Lê Văn Tùng (Quản đốc Xưởng May)",
           actorRole: "PRODUCTION_STAFF",
@@ -141,6 +171,58 @@ export default function BodSettingsScreen({
           documentRef: "CB-2026-02",
           details: "Yêu cầu cấp bù 28.000.000 VNĐ vải Kaki do lỗi dập rập đợt 1. Đã ghi sổ vi phạm.",
           severity: "INFO"
+        },
+        {
+          id: 9,
+          createdAt: "2026-07-18 17:00:22",
+          actorName: "Nguyễn Văn Hùng (Kế toán trưởng)",
+          actorRole: "ACCOUNTANT",
+          ipAddress: "14.232.180.12",
+          action: "Thay đổi cấu hình",
+          actionType: "SETTING_CHANGE",
+          module: "Hệ thống",
+          documentRef: "CẤU-HÌNH-02",
+          details: "Cập nhật số ngày quá hạn nợ xấu Vùng Đỏ từ 60 ngày lên 90 ngày theo quy chế tài chính mới.",
+          severity: "WARNING"
+        },
+        {
+          id: 10,
+          createdAt: "2026-07-18 13:20:15",
+          actorName: "Phạm Anh (Giám đốc)",
+          actorRole: "BOD / DIRECTOR",
+          ipAddress: "118.70.124.89",
+          action: "Từ chối",
+          actionType: "REJECT",
+          module: "Sản xuất",
+          documentRef: "KHSX-2026-06",
+          details: "Từ chối duyệt kế hoạch sản xuất gia công ngoài do vượt 35% chi phí dự toán BOM.",
+          severity: "CRITICAL"
+        },
+        {
+          id: 11,
+          createdAt: "2026-07-17 09:10:05",
+          actorName: "Trần Thị Mai (Trưởng phòng Nhân sự)",
+          actorRole: "HR MANAGER",
+          ipAddress: "118.70.124.15",
+          action: "Phê duyệt",
+          actionType: "APPROVE",
+          module: "Nhân sự",
+          documentRef: "NP-2026-42",
+          details: "Phê duyệt đơn xin nghỉ phép 3 ngày của Quản đốc Lê Văn Tùng có lý do cá nhân.",
+          severity: "INFO"
+        },
+        {
+          id: 12,
+          createdAt: "2026-07-16 16:50:00",
+          actorName: "Phạm Anh (Giám đốc)",
+          actorRole: "BOD / DIRECTOR",
+          ipAddress: "118.70.124.89",
+          action: "Phê duyệt",
+          actionType: "APPROVE",
+          module: "Kinh doanh",
+          documentRef: "DH-SALE-980",
+          details: "Ký duyệt hợp đồng cung ứng 5.000 bộ đồng phục công sở trị giá 650.000.000 VNĐ.",
+          severity: "CRITICAL"
         }
       ]);
 
@@ -172,16 +254,31 @@ export default function BodSettingsScreen({
     }
   };
 
-  // Filtered logs list
+  // Filtered logs list across all 5 dimensions
   const filteredLogs = auditLogs.filter(log => {
     const matchSearch = !logSearch ||
       log.details.toLowerCase().includes(logSearch.toLowerCase()) ||
-      log.documentRef.toLowerCase().includes(logSearch.toLowerCase()) ||
-      log.actorName.toLowerCase().includes(logSearch.toLowerCase());
+      log.documentRef.toLowerCase().includes(logSearch.toLowerCase());
+    const matchActor = !logActorFilter ||
+      log.actorName.toLowerCase().includes(logActorFilter.toLowerCase()) ||
+      log.actorRole.toLowerCase().includes(logActorFilter.toLowerCase()) ||
+      log.ipAddress.toLowerCase().includes(logActorFilter.toLowerCase());
+    const matchAction = logActionFilter === "ALL" || log.action === logActionFilter;
     const matchModule = logModuleFilter === "ALL" || log.module === logModuleFilter;
     const matchSeverity = logSeverityFilter === "ALL" || log.severity === logSeverityFilter;
-    return matchSearch && matchModule && matchSeverity;
+    const matchDate = !logDateFilter || log.createdAt.startsWith(logDateFilter);
+
+    return matchSearch && matchActor && matchAction && matchModule && matchSeverity && matchDate;
   });
+
+  const resetAuditLogFilters = () => {
+    setLogSearch("");
+    setLogActorFilter("");
+    setLogActionFilter("ALL");
+    setLogModuleFilter("ALL");
+    setLogSeverityFilter("ALL");
+    setLogDateFilter("");
+  };
 
   return (
     <div className="flex-1 bg-slate-50/50 overflow-y-auto overflow-x-hidden min-h-screen pb-12">
@@ -245,83 +342,98 @@ export default function BodSettingsScreen({
             >
               Hạn mức duyệt rủi ro
             </button>
-
-            {/* Sub-tab 3: Notifications */}
-            <button
-              type="button"
-              onClick={() => setActiveSubTab("notifications")}
-              className={`pb-2.5 text-xs transition-all relative font-sans whitespace-nowrap cursor-pointer ${activeSubTab === "notifications"
-                  ? "text-blue-950 font-medium after:absolute after:bottom-0 after:left-0 after:right-0 after:h-[3px] after:bg-blue-950 after:rounded-full"
-                  : "text-slate-400 hover:text-slate-650 font-display"
-                }`}
-            >
-              Cấu hình kênh thông báo
-            </button>
-
-            {/* Sub-tab 4: Delegation */}
-            <button
-              type="button"
-              onClick={() => setActiveSubTab("delegation")}
-              className={`pb-2.5 text-xs transition-all relative font-sans whitespace-nowrap cursor-pointer ${activeSubTab === "delegation"
-                  ? "text-blue-950 font-medium after:absolute after:bottom-0 after:left-0 after:right-0 after:h-[3px] after:bg-blue-950 after:rounded-full"
-                  : "text-slate-400 hover:text-slate-650 font-display"
-                }`}
-            >
-              Ủy quyền phê duyệt tạm thời
-            </button>
-
           </div>
 
           {/* SUB-TAB 1: AUDIT LOGS */}
           {activeSubTab === "audit-logs" && (
             <div className="space-y-4 animate-in fade-in duration-200">
 
-              {/* Filter Bar */}
-              <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-3 bg-slate-50/70 p-3.5 rounded-2xl border border-slate-100">
-
-                {/* Search */}
-                <div className="relative flex-1 w-full md:w-auto">
-                  <Search className="w-4 h-4 absolute left-3 top-2.5 text-slate-400 stroke-[2]" />
-                  <input
-                    type="text"
-                    value={logSearch}
-                    onChange={(e) => setLogSearch(e.target.value)}
-                    placeholder="Tìm kiếm vết log, mã chứng từ, người thực hiện..."
-                    className="w-full bg-white border border-slate-200/80 rounded-xl pl-9 pr-3 py-1.5 text-xs font-display focus:outline-none focus:border-blue-950 transition-colors"
-                  />
+              {/* 5-Dimensional Search & Filter Bar */}
+              <div className="bg-slate-50/80 p-4 rounded-2xl border border-slate-100/90 space-y-3">
+                <div className="flex items-center justify-between">
+                  <span className="text-xs font-medium text-slate-700 font-sans flex items-center">
+                    <Filter className="w-3.5 h-3.5 mr-1.5 text-blue-950 stroke-[2]" />
+                    Bộ lọc tra cứu vết nhật ký hoạt động
+                  </span>
+                  {(logSearch || logActorFilter || logActionFilter !== "ALL" || logModuleFilter !== "ALL" || logSeverityFilter !== "ALL" || logDateFilter) && (
+                    <button
+                      onClick={resetAuditLogFilters}
+                      className="text-[11px] text-rose-600 hover:text-rose-700 font-medium font-sans flex items-center cursor-pointer bg-white px-2.5 py-1 rounded-lg border border-rose-200/80 shadow-2xs"
+                    >
+                      <RefreshCw className="w-3 h-3 mr-1 text-rose-600" />
+                      Xóa bộ lọc
+                    </button>
+                  )}
                 </div>
 
-                {/* Filters */}
-                <div className="flex items-center space-x-2 w-full md:w-auto">
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-2.5">
+                  
+                  {/* 1. Tìm kiếm theo Nội dung / Mã chứng từ */}
+                  <div className="relative">
+                    <Search className="w-3.5 h-3.5 absolute left-3 top-3 text-slate-400 stroke-[2]" />
+                    <input
+                      type="text"
+                      value={logSearch}
+                      onChange={(e) => setLogSearch(e.target.value)}
+                      placeholder="Nội dung / Mã chứng từ..."
+                      className="w-full bg-white border border-slate-200/80 rounded-xl pl-8 pr-3 py-2 h-[38px] text-xs font-display focus:outline-none focus:border-blue-950 transition-colors placeholder:text-slate-400"
+                    />
+                  </div>
 
-                  {/* Module filter */}
-                  <select
+                  {/* 2. Tìm kiếm theo Người thực hiện */}
+                  <div className="relative">
+                    <User className="w-3.5 h-3.5 absolute left-3 top-3 text-slate-400 stroke-[2]" />
+                    <input
+                      type="text"
+                      value={logActorFilter}
+                      onChange={(e) => setLogActorFilter(e.target.value)}
+                      placeholder="Người thực hiện / IP..."
+                      className="w-full bg-white border border-slate-200/80 rounded-xl pl-8 pr-3 py-2 h-[38px] text-xs font-display focus:outline-none focus:border-blue-950 transition-colors placeholder:text-slate-400"
+                    />
+                  </div>
+
+                  {/* 3. Lọc theo Thời gian */}
+                  <div className="relative">
+                    <Calendar className="w-3.5 h-3.5 absolute left-3 top-3 text-slate-400 stroke-[2]" />
+                    <input
+                      type="date"
+                      value={logDateFilter}
+                      onChange={(e) => setLogDateFilter(e.target.value)}
+                      className="w-full bg-white border border-slate-200/80 rounded-xl pl-8 pr-3 py-2 h-[38px] text-xs font-medium font-sans text-slate-700 focus:outline-none focus:border-blue-950"
+                    />
+                  </div>
+
+                  {/* 4. Lọc theo Phân hệ */}
+                  <CustomSelect
                     value={logModuleFilter}
-                    onChange={(e) => setLogModuleFilter(e.target.value)}
-                    className="bg-white border border-slate-200/80 rounded-xl px-3 py-1.5 text-xs font-medium text-slate-700 font-sans focus:outline-none focus:border-blue-950"
-                  >
-                    <option value="ALL">Tất cả phân hệ</option>
-                    <option value="Sản xuất">Sản xuất</option>
-                    <option value="Kinh doanh">Kinh doanh</option>
-                    <option value="Tài chính">Tài chính</option>
-                    <option value="Nhân sự">Nhân sự</option>
-                    <option value="Hệ thống">Hệ thống</option>
-                  </select>
+                    onChange={(val) => setLogModuleFilter(val)}
+                    options={[
+                      { value: "ALL", label: "Tất cả phân hệ" },
+                      { value: "Sản xuất", label: "Sản xuất" },
+                      { value: "Kinh doanh", label: "Kinh doanh" },
+                      { value: "Tài chính", label: "Tài chính" },
+                      { value: "Nhân sự", label: "Nhân sự" },
+                      { value: "Hệ thống", label: "Hệ thống" },
+                    ]}
+                    className="w-full"
+                  />
 
-                  {/* Severity filter */}
-                  <select
-                    value={logSeverityFilter}
-                    onChange={(e) => setLogSeverityFilter(e.target.value)}
-                    className="bg-white border border-slate-200/80 rounded-xl px-3 py-1.5 text-xs font-medium text-slate-700 font-sans focus:outline-none focus:border-blue-950"
-                  >
-                    <option value="ALL">Tất cả mức độ</option>
-                    <option value="INFO">INFO (Thông thường)</option>
-                    <option value="WARNING">WARNING (Cảnh báo)</option>
-                    <option value="CRITICAL">CRITICAL (Rủi ro lớn)</option>
-                  </select>
+                  {/* 5. Lọc theo Hành động */}
+                  <CustomSelect
+                    value={logActionFilter}
+                    onChange={(val) => setLogActionFilter(val)}
+                    options={[
+                      { value: "ALL", label: "Tất cả hành động" },
+                      { value: "Phê duyệt", label: "Phê duyệt" },
+                      { value: "Từ chối", label: "Từ chối" },
+                      { value: "Duyệt chi", label: "Duyệt chi" },
+                      { value: "Thay đổi cấu hình", label: "Thay đổi cấu hình" },
+                      { value: "Đề xuất cấp bù", label: "Đề xuất cấp bù" },
+                    ]}
+                    className="w-full"
+                  />
 
                 </div>
-
               </div>
 
               {/* Audit Logs Table */}
@@ -517,157 +629,6 @@ export default function BodSettingsScreen({
                 >
                   <Save className="w-4 h-4 mr-2 stroke-[2]" />
                   {isSavingThresholds ? "Đang lưu..." : "Lưu cấu hình ngưỡng"}
-                </button>
-              </div>
-
-            </div>
-          )}
-
-          {/* SUB-TAB 3: NOTIFICATION PREFERENCES */}
-          {activeSubTab === "notifications" && (
-            <div className="space-y-5 animate-in fade-in duration-200">
-
-              <div className="p-5 rounded-3xl border border-slate-100 bg-white space-y-4">
-                <h4 className="text-sm font-medium text-slate-800 font-sans flex items-center">
-                  <Bell className="w-4 h-4 mr-2 text-blue-950 stroke-[2]" />
-                  Kênh thông báo &amp; Tần suất báo thức đầu ngày
-                </h4>
-
-                {/* Option 1: Realtime Push */}
-                <div className="flex items-center justify-between p-3.5 bg-slate-50/70 rounded-2xl border border-slate-100">
-                  <div>
-                    <span className="text-xs font-medium text-slate-800 font-sans block">Thông báo đẩy thời gian thực (Real-time Push)</span>
-                    <span className="text-[11px] text-slate-400 font-display">Hiện popup thông báo ngay lập tức khi có đơn rủi ro hoặc kế hoạch sản xuất mới.</span>
-                  </div>
-                  <input
-                    type="checkbox"
-                    checked={pushEnabled}
-                    onChange={(e) => setPushEnabled(e.target.checked)}
-                    className="w-4.5 h-4.5 accent-blue-950 cursor-pointer"
-                  />
-                </div>
-
-                {/* Option 2: Morning Digest */}
-                <div className="flex items-center justify-between p-3.5 bg-slate-50/70 rounded-2xl border border-slate-100">
-                  <div>
-                    <span className="text-xs font-medium text-slate-800 font-sans block">Báo cáo tóm tắt đầu ngày (Daily Morning Digest 8:00 AM)</span>
-                    <span className="text-[11px] text-slate-400 font-display">Tự động tổng hợp thông tin dòng tiền thực thu và số lượng đề xuất chờ duyệt lúc 8:00 sáng.</span>
-                  </div>
-                  <input
-                    type="checkbox"
-                    checked={digestEnabled}
-                    onChange={(e) => setDigestEnabled(e.target.checked)}
-                    className="w-4.5 h-4.5 accent-blue-950 cursor-pointer"
-                  />
-                </div>
-
-                {/* Option 3: Critical Email Alerts */}
-                <div className="flex items-center justify-between p-3.5 bg-slate-50/70 rounded-2xl border border-slate-100">
-                  <div>
-                    <span className="text-xs font-medium text-slate-800 font-sans block">Cảnh báo khẩn cấp qua Email (CRITICAL events)</span>
-                    <span className="text-[11px] text-slate-400 font-display">Gửi thư điện tử khẩn cấp khi âm lợi nhuận ròng hoặc nợ xấu quá hạn mức nghiêm trọng.</span>
-                  </div>
-                  <input
-                    type="checkbox"
-                    checked={emailAlertsEnabled}
-                    onChange={(e) => setEmailAlertsEnabled(e.target.checked)}
-                    className="w-4.5 h-4.5 accent-blue-950 cursor-pointer"
-                  />
-                </div>
-
-              </div>
-
-              <div className="pt-2 flex justify-end">
-                <button
-                  type="button"
-                  onClick={() => showToast("Đã lưu thiết lập kênh thông báo thành công!")}
-                  className="px-6 py-2.5 bg-blue-950 hover:bg-blue-900 text-white rounded-2xl text-xs font-medium font-sans shadow-md shadow-blue-950/20 transition-all flex items-center cursor-pointer"
-                >
-                  <Save className="w-4 h-4 mr-2 stroke-[2]" />
-                  Lưu cấu hình thông báo
-                </button>
-              </div>
-
-            </div>
-          )}
-
-          {/* SUB-TAB 4: APPROVAL DELEGATION */}
-          {activeSubTab === "delegation" && (
-            <div className="space-y-5 animate-in fade-in duration-200">
-
-              <div className="bg-amber-50/40 border border-amber-200/80 p-4 rounded-2xl flex items-start space-x-3">
-                <UserCheck className="w-5 h-5 text-amber-700 shrink-0 mt-0.5 stroke-[2]" />
-                <div className="text-xs text-amber-900 font-display leading-relaxed">
-                  <span className="font-medium font-sans">Ủy quyền phê duyệt công tác:</span> Khi Giám đốc vắng mặt, người được ủy quyền (Phó Giám đốc / Kế toán trưởng) có quyền bấm duyệt chứng từ thay thế trong thời gian chỉ định. Hệ thống tự động lưu vết dấu bản quyền trên chứng từ.
-                </div>
-              </div>
-
-              <div className="p-5 rounded-3xl border border-slate-100 bg-white space-y-4">
-                <div className="flex justify-between items-center">
-                  <h4 className="text-sm font-medium text-slate-800 font-sans">Ủy quyền phê duyệt tạm thời</h4>
-                  <div className="flex items-center space-x-2">
-                    <span className="text-xs text-slate-500 font-display">Kích hoạt ủy quyền:</span>
-                    <input
-                      type="checkbox"
-                      checked={delegationActive}
-                      onChange={(e) => setDelegationActive(e.target.checked)}
-                      className="w-4.5 h-4.5 accent-blue-950 cursor-pointer"
-                    />
-                  </div>
-                </div>
-
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-4 pt-1">
-                  <div className="space-y-1">
-                    <label className="text-xs font-medium text-slate-600 font-sans block">Người nhận ủy quyền:</label>
-                    <select
-                      value={delegateeName}
-                      onChange={(e) => setDelegateeName(e.target.value)}
-                      className="w-full bg-slate-50 border border-slate-200 rounded-2xl px-3.5 py-2 text-xs font-medium text-slate-800 font-sans focus:outline-none focus:border-blue-950"
-                    >
-                      <option value="Trần Quốc Bảo (Phó Giám Đốc)">Trần Quốc Bảo (Phó Giám Đốc)</option>
-                      <option value="Nguyễn Văn Hùng (Kế toán trưởng)">Nguyễn Văn Hùng (Kế toán trưởng)</option>
-                    </select>
-                  </div>
-
-                  <div className="space-y-1">
-                    <label className="text-xs font-medium text-slate-600 font-sans block">Ủy quyền từ ngày:</label>
-                    <input
-                      type="date"
-                      value={delegatedFromDate}
-                      onChange={(e) => setDelegatedFromDate(e.target.value)}
-                      className="w-full bg-slate-50 border border-slate-200 rounded-2xl px-3.5 py-2 text-xs font-medium text-slate-800 font-sans focus:outline-none focus:border-blue-950"
-                    />
-                  </div>
-
-                  <div className="space-y-1">
-                    <label className="text-xs font-medium text-slate-600 font-sans block">Đến ngày kết thúc:</label>
-                    <input
-                      type="date"
-                      value={delegatedToDate}
-                      onChange={(e) => setDelegatedToDate(e.target.value)}
-                      className="w-full bg-slate-50 border border-slate-200 rounded-2xl px-3.5 py-2 text-xs font-medium text-slate-800 font-sans focus:outline-none focus:border-blue-950"
-                    />
-                  </div>
-                </div>
-
-                {/* Stamp Preview */}
-                <div className="p-4 bg-slate-50 rounded-2xl border border-slate-150 text-xs font-display space-y-1 text-slate-600">
-                  <span className="font-medium text-slate-800 font-sans block">Mẫu dấu ghi vết phê duyệt ủy quyền trên chứng từ:</span>
-                  <p className="font-mono text-blue-950 bg-white p-2 rounded-xl border border-slate-200">
-                    "Phê duyệt bởi {delegateeName} (Ủy quyền bởi Phạm Anh - Giám đốc, từ {delegatedFromDate} đến {delegatedToDate})"
-                  </p>
-                </div>
-
-              </div>
-
-              <div className="pt-2 flex justify-end">
-                <button
-                  type="button"
-                  onClick={() => showToast("Đã lưu thiết lập ủy quyền thành công!")}
-                  className="px-6 py-2.5 bg-blue-950 hover:bg-blue-900 text-white rounded-2xl text-xs font-medium font-sans shadow-md shadow-blue-950/20 transition-all flex items-center cursor-pointer"
-                >
-                  <Save className="w-4 h-4 mr-2 stroke-[2]" />
-                  Lưu cấu hình ủy quyền
                 </button>
               </div>
 

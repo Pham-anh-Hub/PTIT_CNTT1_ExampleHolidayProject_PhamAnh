@@ -7,6 +7,7 @@ import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
 
 import java.util.List;
+import java.util.Optional;
 
 /**
  * PayrollRepository cung cấp các phương thức truy vấn bảng 'payrolls'.
@@ -40,4 +41,6 @@ public interface PayrollRepository extends JpaRepository<Payroll, Long> {
            "GROUP BY p.period, p.status " +
            "ORDER BY p.period DESC")
     List<Object[]> getMonthlyPayrollSummary(@Param("companyId") Long companyId);
+
+    Optional<Payroll> findByEmployeeIdAndPeriod(Long employeeId, String period);
 }

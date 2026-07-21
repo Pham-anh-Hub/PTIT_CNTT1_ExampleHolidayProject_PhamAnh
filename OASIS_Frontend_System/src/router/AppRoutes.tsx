@@ -241,7 +241,11 @@ function ProductionWrapper() {
 }
 
 // ─── Wrapper: AccountantScreen ────────────────────────────────────────────────
-function AccountantWrapper() {
+interface AccountantWrapperProps {
+  initialTab?: "payroll_production" | "payroll_office" | "receipts_expenses" | "debts";
+}
+
+function AccountantWrapper({ initialTab = "payroll_production" }: AccountantWrapperProps) {
   const data = useContext(DataContext)!;
   const { employees, contracts, orders, materialImports, setMaterialImports, finishedImports, setFinishedImports } = data;
 
@@ -255,6 +259,7 @@ function AccountantWrapper() {
   return (
     <Suspense fallback={<LoadingSpinner />}>
       <AccountantScreen
+        initialTab={initialTab}
         employees={employees}
         contracts={contracts}
         orders={orders}
@@ -294,8 +299,6 @@ function WorkerWrapper() {
 // ─── Wrapper: TenantDetailScreen ──────────────────────────────────────────────
 function TenantDetailWrapper() {
   const { tenantId } = useParams<{ tenantId: string }>();
-  // TenantDetailScreen loads full data from API using tenant.id
-  // We only need to pass a minimal object to satisfy the prop type
   const fakeTenant = {
     id: tenantId ?? "",
     name: "",
@@ -376,9 +379,13 @@ export default function AppRoutes({ onLoginSuccess }: AppRoutesProps) {
             <Route path={ROUTES.PRODUCTION_PLANS} element={<ProductionWrapper />} />
           </Route>
 
-          {/* Accountant */}
+          {/* Accountant — 4 Direct URL Routes */}
           <Route element={<RequireRole allowedRoles={ACCOUNTANT_ROLES} />}>
-            <Route path={ROUTES.ACCOUNTANT_FINANCE} element={<AccountantWrapper />} />
+            <Route path={ROUTES.ACCOUNTANT_FINANCE} element={<Navigate to={ROUTES.ACCOUNTANT_PRODUCTION_PAYROLL} replace />} />
+            <Route path={ROUTES.ACCOUNTANT_PRODUCTION_PAYROLL} element={<AccountantWrapper initialTab="payroll_production" />} />
+            <Route path={ROUTES.ACCOUNTANT_OFFICE_PAYROLL} element={<AccountantWrapper initialTab="payroll_office" />} />
+            <Route path={ROUTES.ACCOUNTANT_VOUCHERS} element={<AccountantWrapper initialTab="receipts_expenses" />} />
+            <Route path={ROUTES.ACCOUNTANT_DEBTS} element={<AccountantWrapper initialTab="debts" />} />
           </Route>
 
           {/* Worker */}

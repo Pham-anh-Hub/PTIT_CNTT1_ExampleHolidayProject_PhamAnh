@@ -1,10 +1,10 @@
 export const API_BASE_URL = "http://localhost:8080";
 
-// Ghi đè fetch toàn cục để bắt lỗi 401 Unauthorized (hết hạn token)
+// Ghi đè fetch toàn cục để bắt lỗi 401 Unauthorized & 403 Forbidden (hết hạn token)
 const originalFetch = window.fetch;
 window.fetch = async (input, init) => {
   const res = await originalFetch(input, init);
-  if (res.status === 401) {
+  if (res.status === 401 || res.status === 403) {
     const urlString = typeof input === "string" 
       ? input 
       : (input instanceof Request ? input.url : input.toString());
@@ -918,3 +918,128 @@ export async function updateBodThresholdsApi(dto: any) {
   });
   return res.json();
 }
+
+// ─── Accounting Module APIs ──────────────────────────────────────────────────
+export async function createExpenseApi(dto: {
+  category: string;
+  refId?: number;
+  recipientName: string;
+  amount: number;
+  paymentMethod?: string;
+  note?: string;
+}) {
+  const res = await fetch(`${API_BASE_URL}/api/v1/accounting/expenses`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      ...getAuthHeader(),
+    },
+    body: JSON.stringify(dto),
+  });
+  const json = await res.json();
+  if (!res.ok) {
+    throw new Error(json.message || "Không thể lập phiếu chi");
+  }
+  return json;
+}
+
+export async function createReceiptApi(dto: {
+  orderId?: number;
+  customerId?: number;
+  amount: number;
+  paymentMethod?: string;
+  note?: string;
+}) {
+  const res = await fetch(`${API_BASE_URL}/api/v1/accounting/receipts`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      ...getAuthHeader(),
+    },
+    body: JSON.stringify(dto),
+  });
+  const json = await res.json();
+  if (!res.ok) {
+    throw new Error(json.message || "Không thể lập phiếu thu");
+  }
+  return json;
+}
+
+export async function getExpensesApi() {
+  const res = await fetch(`${API_BASE_URL}/api/v1/accounting/expenses`, {
+    method: "GET",
+    headers: getAuthHeader(),
+  });
+  const json = await res.json();
+  if (!res.ok) {
+    throw new Error(json.message || "Không thể tải danh sách phiếu chi");
+  }
+  return json;
+}
+
+export async function getReceiptsApi() {
+  const res = await fetch(`${API_BASE_URL}/api/v1/accounting/receipts`, {
+    method: "GET",
+    headers: getAuthHeader(),
+  });
+  const json = await res.json();
+  if (!res.ok) {
+    throw new Error(json.message || "Không thể tải danh sách phiếu thu");
+  }
+  return json;
+}
+
+// ─── Production Work Logs & Payroll APIs ──────────────────────────────────────
+export async function getDailyWorkLogsApi(employeeId: string | number, period: string) {
+  const res = await fetch(`${API_BASE_URL}/api/v1/work-logs/production/daily?employee_id=${employeeId}&period=${encodeURIComponent(period)}`, {
+    method: "GET",
+    headers: getAuthHeader(),
+  });
+  const json = await res.json();
+  if (!res.ok) {
+    throw new Error(json.message || "Không thể tải nhật ký công nhật của nhân viên");
+  }
+  return json;
+}
+
+export async function createDailyWorkLogApi(dto: any) {
+  const res = await fetch(`${API_BASE_URL}/api/v1/work-logs/production/daily`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      ...getAuthHeader(),
+    },
+    body: JSON.stringify(dto),
+  });
+  const json = await res.json();
+  if (!res.ok) {
+    throw new Error(json.message || "Không thể ghi nhận nhật ký công nhật");
+  }
+  return json;
+}
+
+export async function getProductionPayrollApi(period: string) {
+  const res = await fetch(`${API_BASE_URL}/api/v1/payroll/production?period=${encodeURIComponent(period)}`, {
+    method: "GET",
+    headers: getAuthHeader(),
+  });
+  const json = await res.json();
+  if (!res.ok) {
+    throw new Error(json.message || "Không thể tải bảng lương sản xuất");
+  }
+  return json;
+}
+
+export async function resolveProductionPayrollApi(employeeId: string | number, period: string) {
+  const res = await fetch(`${API_BASE_URL}/api/v1/payroll/production/${employeeId}/resolve?period=${encodeURIComponent(period)}`, {
+    method: "PUT",
+    headers: getAuthHeader(),
+  });
+  const json = await res.json();
+  if (!res.ok) {
+    throw new Error(json.message || "Không thể duyệt chi lương sản xuất");
+  }
+  return json;
+}
+
+

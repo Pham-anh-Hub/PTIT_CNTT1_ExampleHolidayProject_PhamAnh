@@ -44,4 +44,11 @@ public class ProductionStageWorkLog {
 
     @Column(name = "computed_amount", nullable = false)
     private BigDecimal computedAmount; // Thu nhập tạm tính tự động (hoursWorked * rate hoặc quantityCompleted * rate)
+
+    @Column(name = "shift_name", length = 100)
+    private String shiftName; // Ca làm / Khung giờ (ví dụ: Ca Hành chính, Ca Hành chính + OT (2h))
+
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "approved_by_id")
+    private Employee approvedBy; // Quản đốc / Cán bộ duyệt chấm công
 }

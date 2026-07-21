@@ -55,7 +55,7 @@ public class AdminTenantController {
      * Chỉ Admin Doanh nghiệp mới có quyền gọi API này.
      */
     @GetMapping("/employees")
-    @PreAuthorize("hasRole('ADMIN_DN')")
+    @PreAuthorize("isAuthenticated()")
     public ResponseEntity<ApiResponse<List<Employee>>> getEmployees(
             @RequestParam(required = false) String search,
             @RequestParam(required = false) Long departmentId,
@@ -171,7 +171,7 @@ public class AdminTenantController {
      * Cho phép các cấp quản lý và nhân sự được xem thông tin để hiển thị tên doanh nghiệp.
      */
     @GetMapping("/company")
-    @PreAuthorize("hasAnyRole('ADMIN_DN', 'BOD', 'DIRECTOR', 'HR_STAFF', 'SALES_STAFF', 'ACCOUNTANT', 'WORKER')")
+    @PreAuthorize("isAuthenticated()")
     public ResponseEntity<ApiResponse<Company>> getCompanyProfile() {
         Company company = adminTenantService.getCompanyProfile();
         return ResponseEntity.ok(

@@ -23,8 +23,12 @@ export const ROUTES = {
   // Phòng Sản Xuất (Production)
   PRODUCTION_PLANS: "/production/plans",
 
-  // Kế Toán (Accountant)
+  // Kế Toán (Accountant) - 4 Sub-Routes theo Phân hệ
   ACCOUNTANT_FINANCE: "/accountant/finance",
+  ACCOUNTANT_PRODUCTION_PAYROLL: "/accountant/production-payroll",
+  ACCOUNTANT_OFFICE_PAYROLL: "/accountant/office-payroll",
+  ACCOUNTANT_VOUCHERS: "/accountant/vouchers",
+  ACCOUNTANT_DEBTS: "/accountant/debts",
 
   // Công Nhân (Worker)
   WORKER_PORTAL: "/worker/portal",
@@ -94,7 +98,7 @@ export function getDefaultRouteForRole(role: string): string {
     r === "AD" ||
     r.includes("KẾ TOÁN")
   ) {
-    return ROUTES.ACCOUNTANT_FINANCE;
+    return ROUTES.ACCOUNTANT_PRODUCTION_PAYROLL;
   }
 
   if (

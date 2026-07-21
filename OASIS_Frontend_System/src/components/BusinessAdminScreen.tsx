@@ -120,7 +120,7 @@ export default function BusinessAdminScreen({
 
   // States cho Cơ cấu Tổ chức (Tab 3)
   const [orgSubTab, setOrgSubTab] = useState<"departments" | "positions">("departments");
-  
+
   // Modals & Forms cho Phòng ban
   const [showDeptModal, setShowDeptModal] = useState(false);
   const [editingDept, setEditingDept] = useState<any | null>(null);
@@ -417,20 +417,46 @@ export default function BusinessAdminScreen({
         getTenantEmployeesApi().catch(() => ({ data: [] }))
       ]);
 
-      const fetchedDepts = deptsRes.data || [];
-      const fetchedPositions = posRes.data || [];
-      const fetchedRoles = rolesRes.data || [];
+      let fetchedDepts = deptsRes.data || [];
+      let fetchedPositions = posRes.data || [];
+      let fetchedRoles = rolesRes.data || [];
       const fetchedEmployees = empsRes.data || [];
+
+      // Danh mục Vai trò đăng nhập chuẩn hệ thống (Bao gồm Nhân viên phòng Kế toán)
+      const defaultRoles = [
+        { id: 1, name: "ACCOUNTANT", description: "Nhân viên phòng Kế toán" },
+        { id: 2, name: "BOD", description: "Ban Giám đốc" },
+        { id: 3, name: "HR_MANAGER", description: "Trưởng phòng / Quản lý Nhân sự" },
+        { id: 4, name: "SALES", description: "Nhân viên Kinh doanh" },
+        { id: 5, name: "PRODUCTION_STAFF", description: "Quản đốc / Kỹ thuật Xưởng sản xuất" },
+        { id: 6, name: "WORKER", description: "Công nhân sản xuất" }
+      ];
+
+      // Hợp nhất danh sách role từ Backend và role hệ thống nếu thiếu
+      let mergedRoles = [...fetchedRoles];
+      if (mergedRoles.length === 0) {
+        mergedRoles = defaultRoles;
+      } else {
+        defaultRoles.forEach(defRole => {
+          const exists = mergedRoles.some((r: any) =>
+            r.name === defRole.name ||
+            (r.description && r.description.toLowerCase().includes(defRole.name.toLowerCase()))
+          );
+          if (!exists) {
+            mergedRoles.push(defRole);
+          }
+        });
+      }
 
       setDepartments(fetchedDepts);
       setPositions(fetchedPositions);
-      setRoles(fetchedRoles);
+      setRoles(mergedRoles);
       setEmployees(fetchedEmployees);
 
       // Điền giá trị mặc định cho Form Thêm nếu danh mục có sẵn
       if (fetchedDepts.length > 0) setAddDeptId(fetchedDepts[0].id);
       if (fetchedPositions.length > 0) setAddPosId(fetchedPositions[0].id);
-      if (fetchedRoles.length > 0) setAddRoleId(fetchedRoles[0].id);
+      if (mergedRoles.length > 0) setAddRoleId(mergedRoles[0].id);
 
     } catch (err: any) {
       console.error(err);
@@ -1248,8 +1274,8 @@ export default function BusinessAdminScreen({
                                   onClick={() => handleOpenRolesModal(emp)}
                                   disabled={!emp.user}
                                   className={`p-1.5 rounded-lg transition-colors ${emp.user
-                                      ? "text-slate-500 hover:bg-slate-100 hover:text-blue-950 cursor-pointer"
-                                      : "text-slate-200 cursor-not-allowed"
+                                    ? "text-slate-500 hover:bg-slate-100 hover:text-blue-950 cursor-pointer"
+                                    : "text-slate-200 cursor-not-allowed"
                                     }`}
                                   title={emp.user ? "Phân quyền kiêm nhiệm vai trò" : "Nhân viên chưa được cấp tài khoản để phân quyền"}
                                 >
@@ -1267,8 +1293,8 @@ export default function BusinessAdminScreen({
                                   }}
                                   disabled={!emp.user || (emp.user && emp.user.email === currentUser?.email)}
                                   className={`p-1.5 rounded-lg transition-colors ${(!emp.user || (emp.user && emp.user.email === currentUser?.email))
-                                      ? "text-slate-200 cursor-not-allowed"
-                                      : "text-slate-500 hover:bg-slate-100 hover:text-rose-600 cursor-pointer"
+                                    ? "text-slate-200 cursor-not-allowed"
+                                    : "text-slate-500 hover:bg-slate-100 hover:text-rose-600 cursor-pointer"
                                     }`}
                                   title={
                                     !emp.user
@@ -1307,11 +1333,10 @@ export default function BusinessAdminScreen({
                 <button
                   type="button"
                   onClick={() => setSubSettingsTab("profile")}
-                  className={`pb-2 text-xs font-bold transition-all relative ${
-                    subSettingsTab === "profile" 
-                      ? "text-blue-950 font-black after:absolute after:bottom-0 after:left-0 after:right-0 after:h-[3px] after:bg-blue-950 after:rounded-full" 
+                  className={`pb-2 text-xs font-bold transition-all relative ${subSettingsTab === "profile"
+                      ? "text-blue-950 font-black after:absolute after:bottom-0 after:left-0 after:right-0 after:h-[3px] after:bg-blue-950 after:rounded-full"
                       : "text-slate-400 hover:text-slate-650 cursor-pointer"
-                  }`}
+                    }`}
                   style={{ fontFamily: "'Poppins', sans-serif" }}
                 >
                   Hồ sơ công ty
@@ -1319,11 +1344,10 @@ export default function BusinessAdminScreen({
                 <button
                   type="button"
                   onClick={() => setSubSettingsTab("approvals")}
-                  className={`pb-2 text-xs font-bold transition-all relative ${
-                    subSettingsTab === "approvals" 
-                      ? "text-blue-950 font-black after:absolute after:bottom-0 after:left-0 after:right-0 after:h-[3px] after:bg-blue-950 after:rounded-full" 
+                  className={`pb-2 text-xs font-bold transition-all relative ${subSettingsTab === "approvals"
+                      ? "text-blue-950 font-black after:absolute after:bottom-0 after:left-0 after:right-0 after:h-[3px] after:bg-blue-950 after:rounded-full"
                       : "text-slate-400 hover:text-slate-650 cursor-pointer"
-                  }`}
+                    }`}
                   style={{ fontFamily: "'Poppins', sans-serif" }}
                 >
                   Cấu hình Phê duyệt
@@ -1331,11 +1355,10 @@ export default function BusinessAdminScreen({
                 <button
                   type="button"
                   onClick={() => setSubSettingsTab("departments")}
-                  className={`pb-2 text-xs font-bold transition-all relative ${
-                    subSettingsTab === "departments" 
-                      ? "text-blue-950 font-black after:absolute after:bottom-0 after:left-0 after:right-0 after:h-[3px] after:bg-blue-950 after:rounded-full" 
+                  className={`pb-2 text-xs font-bold transition-all relative ${subSettingsTab === "departments"
+                      ? "text-blue-950 font-black after:absolute after:bottom-0 after:left-0 after:right-0 after:h-[3px] after:bg-blue-950 after:rounded-full"
                       : "text-slate-400 hover:text-slate-650 cursor-pointer"
-                  }`}
+                    }`}
                   style={{ fontFamily: "'Poppins', sans-serif" }}
                 >
                   Cơ cấu tổ chức
@@ -1533,14 +1556,12 @@ export default function BusinessAdminScreen({
                                         updated[idx].isEnabled = !updated[idx].isEnabled;
                                         setApprovalSettings(updated);
                                       }}
-                                      className={`relative inline-flex h-6 w-11 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none ${
-                                        rule.isEnabled ? "bg-blue-950" : "bg-slate-200"
-                                      } disabled:opacity-50 disabled:cursor-not-allowed`}
+                                      className={`relative inline-flex h-6 w-11 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none ${rule.isEnabled ? "bg-blue-950" : "bg-slate-200"
+                                        } disabled:opacity-50 disabled:cursor-not-allowed`}
                                     >
                                       <span
-                                        className={`pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out ${
-                                          rule.isEnabled ? "translate-x-5" : "translate-x-0"
-                                        }`}
+                                        className={`pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out ${rule.isEnabled ? "translate-x-5" : "translate-x-0"
+                                          }`}
                                       />
                                     </button>
                                   </div>
@@ -1575,11 +1596,10 @@ export default function BusinessAdminScreen({
                     <button
                       type="button"
                       onClick={() => setOrgSubTab("departments")}
-                      className={`pb-1.5 text-xs font-bold transition-all relative ${
-                        orgSubTab === "departments"
+                      className={`pb-1.5 text-xs font-bold transition-all relative ${orgSubTab === "departments"
                           ? "text-blue-950 font-black after:absolute after:bottom-0 after:left-0 after:right-0 after:h-0.5 after:bg-blue-950"
                           : "text-slate-400 hover:text-slate-650 cursor-pointer"
-                      }`}
+                        }`}
                       style={{ fontFamily: "'Poppins', sans-serif" }}
                     >
                       Cơ cấu Phòng ban
@@ -1587,11 +1607,10 @@ export default function BusinessAdminScreen({
                     <button
                       type="button"
                       onClick={() => setOrgSubTab("positions")}
-                      className={`pb-1.5 text-xs font-bold transition-all relative ${
-                        orgSubTab === "positions"
+                      className={`pb-1.5 text-xs font-bold transition-all relative ${orgSubTab === "positions"
                           ? "text-blue-950 font-black after:absolute after:bottom-0 after:left-0 after:right-0 after:h-0.5 after:bg-blue-950"
                           : "text-slate-400 hover:text-slate-650 cursor-pointer"
-                      }`}
+                        }`}
                       style={{ fontFamily: "'Poppins', sans-serif" }}
                     >
                       Danh sách Chức danh
@@ -2091,169 +2110,169 @@ export default function BusinessAdminScreen({
             {/* Inset scrollable body wrapper */}
             <div className="flex-1 overflow-y-auto custom-scrollbar pr-1.5 max-h-[calc(90vh-75px)]">
               <form onSubmit={handleEditEmployeeSubmit} className="pl-8 pr-6.5 py-6 space-y-4">
-              <div className="space-y-1.5">
-                <label className="text-xs font-bold text-slate-700 block" style={{ fontFamily: "'Roboto', sans-serif" }}>
-                  Họ và tên nhân sự <span className="text-red-500">*</span>
-                </label>
-                <input
-                  type="text"
-                  placeholder="Ví dụ: Nguyễn Văn A"
-                  value={editName}
-                  onChange={(e) => setEditName(e.target.value)}
-                  className={`w-full px-4 py-2.5 bg-white text-slate-800 border rounded-2xl focus:outline-none transition-all duration-150 font-medium ${editErrors.fullname ? "border-red-500 focus:border-red-500" : "border-slate-200 focus:border-blue-950"
-                    }`}
-                  style={{ fontFamily: "'Poppins', sans-serif" }}
-                />
-                {editErrors.fullname && (
-                  <p className="text-[10px] text-red-500 font-bold" style={{ fontFamily: "'Poppins', sans-serif" }}>{editErrors.fullname}</p>
-                )}
-              </div>
-
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div className="space-y-1.5">
                   <label className="text-xs font-bold text-slate-700 block" style={{ fontFamily: "'Roboto', sans-serif" }}>
-                    Số điện thoại
+                    Họ và tên nhân sự <span className="text-red-500">*</span>
                   </label>
                   <input
                     type="text"
-                    placeholder="Ví dụ: 0987654321"
-                    value={editPhone}
-                    onChange={(e) => setEditPhone(e.target.value)}
-                    className="w-full px-4 py-2.5 bg-white text-slate-800 border border-slate-200 rounded-2xl focus:outline-none focus:border-blue-950 transition-all duration-155 font-medium"
+                    placeholder="Ví dụ: Nguyễn Văn A"
+                    value={editName}
+                    onChange={(e) => setEditName(e.target.value)}
+                    className={`w-full px-4 py-2.5 bg-white text-slate-800 border rounded-2xl focus:outline-none transition-all duration-150 font-medium ${editErrors.fullname ? "border-red-500 focus:border-red-500" : "border-slate-200 focus:border-blue-950"
+                      }`}
                     style={{ fontFamily: "'Poppins', sans-serif" }}
                   />
+                  {editErrors.fullname && (
+                    <p className="text-[10px] text-red-500 font-bold" style={{ fontFamily: "'Poppins', sans-serif" }}>{editErrors.fullname}</p>
+                  )}
                 </div>
 
-                <div className="space-y-1.5 relative">
-                  <label className="text-xs font-bold text-slate-700 block" style={{ fontFamily: "'Roboto', sans-serif" }}>
-                    Trạng thái Hồ sơ <span className="text-red-500">*</span>
-                  </label>
-                  <select
-                    value={editStatus}
-                    onChange={(e) => setEditStatus(e.target.value)}
-                    className="w-full px-4 py-2.5 bg-white text-slate-800 border border-slate-200 rounded-2xl focus:outline-none focus:border-blue-950 transition-all font-medium cursor-pointer"
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  <div className="space-y-1.5">
+                    <label className="text-xs font-bold text-slate-700 block" style={{ fontFamily: "'Roboto', sans-serif" }}>
+                      Số điện thoại
+                    </label>
+                    <input
+                      type="text"
+                      placeholder="Ví dụ: 0987654321"
+                      value={editPhone}
+                      onChange={(e) => setEditPhone(e.target.value)}
+                      className="w-full px-4 py-2.5 bg-white text-slate-800 border border-slate-200 rounded-2xl focus:outline-none focus:border-blue-950 transition-all duration-155 font-medium"
+                      style={{ fontFamily: "'Poppins', sans-serif" }}
+                    />
+                  </div>
+
+                  <div className="space-y-1.5 relative">
+                    <label className="text-xs font-bold text-slate-700 block" style={{ fontFamily: "'Roboto', sans-serif" }}>
+                      Trạng thái Hồ sơ <span className="text-red-500">*</span>
+                    </label>
+                    <select
+                      value={editStatus}
+                      onChange={(e) => setEditStatus(e.target.value)}
+                      className="w-full px-4 py-2.5 bg-white text-slate-800 border border-slate-200 rounded-2xl focus:outline-none focus:border-blue-950 transition-all font-medium cursor-pointer"
+                      style={{ fontFamily: "'Poppins', sans-serif" }}
+                    >
+                      <option value="ACTIVE">Chính thức</option>
+                      <option value="PROBATION">Thử việc</option>
+                      <option value="RESIGNED">Nghỉ việc</option>
+                    </select>
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  {/* Custom select: Edit Dept */}
+                  <div className="space-y-1.5 relative">
+                    <label className="text-xs font-bold text-slate-700 block" style={{ fontFamily: "'Roboto', sans-serif" }}>
+                      Phòng ban trực thuộc
+                    </label>
+                    <div className="relative">
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setEditDeptOpen(!editDeptOpen);
+                          setEditPosOpen(false);
+                        }}
+                        className="w-full px-4 py-2.5 bg-white text-slate-800 border border-slate-200 rounded-2xl focus:outline-none focus:border-blue-950 transition-all font-medium text-left cursor-pointer flex items-center justify-between"
+                        style={{ fontFamily: "'Poppins', sans-serif" }}
+                      >
+                        <span>{departments.find(d => d.id === editDeptId)?.name || "Chọn phòng ban"}</span>
+                        <ChevronDown className={`w-4 h-4 text-slate-500 transition-transform ${editDeptOpen ? "rotate-180" : ""}`} />
+                      </button>
+
+                      {editDeptOpen && (
+                        <>
+                          <div className="fixed inset-0 z-30" onClick={() => setEditDeptOpen(false)} />
+                          <div className="absolute left-0 right-0 mt-1 bg-white border border-slate-100 rounded-2xl shadow-xl py-1.5 z-40 max-h-40 overflow-y-auto">
+                            {departments.map(d => (
+                              <button
+                                key={d.id}
+                                type="button"
+                                onClick={() => {
+                                  setEditDeptId(d.id);
+                                  setEditDeptOpen(false);
+                                }}
+                                className={`w-full px-4 py-2 text-left text-xs font-bold transition-colors block ${editDeptId === d.id ? "bg-blue-950/5 text-blue-950" : "text-slate-700 hover:bg-slate-50"
+                                  }`}
+                                style={{ fontFamily: "'Poppins', sans-serif" }}
+                              >
+                                {d.name}
+                              </button>
+                            ))}
+                          </div>
+                        </>
+                      )}
+                    </div>
+                  </div>
+
+                  {/* Custom select: Edit Position */}
+                  <div className="space-y-1.5 relative">
+                    <label className="text-xs font-bold text-slate-700 block" style={{ fontFamily: "'Roboto', sans-serif" }}>
+                      Chức danh công việc
+                    </label>
+                    <div className="relative">
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setEditPosOpen(!editPosOpen);
+                          setEditDeptOpen(false);
+                        }}
+                        className="w-full px-4 py-2.5 bg-white text-slate-800 border border-slate-200 rounded-2xl focus:outline-none focus:border-blue-950 transition-all font-medium text-left cursor-pointer flex items-center justify-between"
+                        style={{ fontFamily: "'Poppins', sans-serif" }}
+                      >
+                        <span>{positions.find(p => p.id === editPosId)?.name || "Chọn chức danh"}</span>
+                        <ChevronDown className={`w-4 h-4 text-slate-500 transition-transform ${editPosOpen ? "rotate-180" : ""}`} />
+                      </button>
+
+                      {editPosOpen && (
+                        <>
+                          <div className="fixed inset-0 z-30" onClick={() => setEditPosOpen(false)} />
+                          <div className="absolute left-0 right-0 mt-1 bg-white border border-slate-100 rounded-2xl shadow-xl py-1.5 z-40 max-h-40 overflow-y-auto">
+                            {positions.map(p => (
+                              <button
+                                key={p.id}
+                                type="button"
+                                onClick={() => {
+                                  setEditPosId(p.id);
+                                  setEditPosOpen(false);
+                                }}
+                                className={`w-full px-4 py-2 text-left text-xs font-bold transition-colors block ${editPosId === p.id ? "bg-blue-950/5 text-blue-950" : "text-slate-700 hover:bg-slate-50"
+                                  }`}
+                                style={{ fontFamily: "'Poppins', sans-serif" }}
+                              >
+                                {p.name}
+                              </button>
+                            ))}
+                          </div>
+                        </>
+                      )}
+                    </div>
+                  </div>
+                </div>
+
+                {/* Action buttons */}
+                <div className="flex items-center space-x-3 pt-6 border-t border-slate-50 mt-6">
+                  <button
+                    type="button"
+                    onClick={() => setShowEditModal(false)}
+                    className="flex-1 py-2.5 rounded-2xl border border-slate-200 hover:bg-slate-50 hover:text-slate-800 text-xs font-bold text-slate-500 transition-all cursor-pointer text-center"
                     style={{ fontFamily: "'Poppins', sans-serif" }}
                   >
-                    <option value="ACTIVE">Chính thức</option>
-                    <option value="PROBATION">Thử việc</option>
-                    <option value="RESIGNED">Nghỉ việc</option>
-                  </select>
+                    Hủy bỏ
+                  </button>
+                  <button
+                    type="submit"
+                    disabled={isEditing}
+                    className="flex-1 py-2.5 rounded-2xl bg-blue-950 hover:bg-blue-900 active:scale-95 text-xs font-bold text-white shadow-lg shadow-blue-950/15 transition-all cursor-pointer text-center"
+                    style={{ fontFamily: "'Poppins', sans-serif" }}
+                  >
+                    {isEditing ? "Đang lưu..." : "Lưu thay đổi"}
+                  </button>
                 </div>
-              </div>
-
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                {/* Custom select: Edit Dept */}
-                <div className="space-y-1.5 relative">
-                  <label className="text-xs font-bold text-slate-700 block" style={{ fontFamily: "'Roboto', sans-serif" }}>
-                    Phòng ban trực thuộc
-                  </label>
-                  <div className="relative">
-                    <button
-                      type="button"
-                      onClick={() => {
-                        setEditDeptOpen(!editDeptOpen);
-                        setEditPosOpen(false);
-                      }}
-                      className="w-full px-4 py-2.5 bg-white text-slate-800 border border-slate-200 rounded-2xl focus:outline-none focus:border-blue-950 transition-all font-medium text-left cursor-pointer flex items-center justify-between"
-                      style={{ fontFamily: "'Poppins', sans-serif" }}
-                    >
-                      <span>{departments.find(d => d.id === editDeptId)?.name || "Chọn phòng ban"}</span>
-                      <ChevronDown className={`w-4 h-4 text-slate-500 transition-transform ${editDeptOpen ? "rotate-180" : ""}`} />
-                    </button>
-
-                    {editDeptOpen && (
-                      <>
-                        <div className="fixed inset-0 z-30" onClick={() => setEditDeptOpen(false)} />
-                        <div className="absolute left-0 right-0 mt-1 bg-white border border-slate-100 rounded-2xl shadow-xl py-1.5 z-40 max-h-40 overflow-y-auto">
-                          {departments.map(d => (
-                            <button
-                              key={d.id}
-                              type="button"
-                              onClick={() => {
-                                setEditDeptId(d.id);
-                                setEditDeptOpen(false);
-                              }}
-                              className={`w-full px-4 py-2 text-left text-xs font-bold transition-colors block ${editDeptId === d.id ? "bg-blue-950/5 text-blue-950" : "text-slate-700 hover:bg-slate-50"
-                                }`}
-                              style={{ fontFamily: "'Poppins', sans-serif" }}
-                            >
-                              {d.name}
-                            </button>
-                          ))}
-                        </div>
-                      </>
-                    )}
-                  </div>
-                </div>
-
-                {/* Custom select: Edit Position */}
-                <div className="space-y-1.5 relative">
-                  <label className="text-xs font-bold text-slate-700 block" style={{ fontFamily: "'Roboto', sans-serif" }}>
-                    Chức danh công việc
-                  </label>
-                  <div className="relative">
-                    <button
-                      type="button"
-                      onClick={() => {
-                        setEditPosOpen(!editPosOpen);
-                        setEditDeptOpen(false);
-                      }}
-                      className="w-full px-4 py-2.5 bg-white text-slate-800 border border-slate-200 rounded-2xl focus:outline-none focus:border-blue-950 transition-all font-medium text-left cursor-pointer flex items-center justify-between"
-                      style={{ fontFamily: "'Poppins', sans-serif" }}
-                    >
-                      <span>{positions.find(p => p.id === editPosId)?.name || "Chọn chức danh"}</span>
-                      <ChevronDown className={`w-4 h-4 text-slate-500 transition-transform ${editPosOpen ? "rotate-180" : ""}`} />
-                    </button>
-
-                    {editPosOpen && (
-                      <>
-                        <div className="fixed inset-0 z-30" onClick={() => setEditPosOpen(false)} />
-                        <div className="absolute left-0 right-0 mt-1 bg-white border border-slate-100 rounded-2xl shadow-xl py-1.5 z-40 max-h-40 overflow-y-auto">
-                          {positions.map(p => (
-                            <button
-                              key={p.id}
-                              type="button"
-                              onClick={() => {
-                                setEditPosId(p.id);
-                                setEditPosOpen(false);
-                              }}
-                              className={`w-full px-4 py-2 text-left text-xs font-bold transition-colors block ${editPosId === p.id ? "bg-blue-950/5 text-blue-950" : "text-slate-700 hover:bg-slate-50"
-                                }`}
-                              style={{ fontFamily: "'Poppins', sans-serif" }}
-                            >
-                              {p.name}
-                            </button>
-                          ))}
-                        </div>
-                      </>
-                    )}
-                  </div>
-                </div>
-              </div>
-
-              {/* Action buttons */}
-              <div className="flex items-center space-x-3 pt-6 border-t border-slate-50 mt-6">
-                <button
-                  type="button"
-                  onClick={() => setShowEditModal(false)}
-                  className="flex-1 py-2.5 rounded-2xl border border-slate-200 hover:bg-slate-50 hover:text-slate-800 text-xs font-bold text-slate-500 transition-all cursor-pointer text-center"
-                  style={{ fontFamily: "'Poppins', sans-serif" }}
-                >
-                  Hủy bỏ
-                </button>
-                <button
-                  type="submit"
-                  disabled={isEditing}
-                  className="flex-1 py-2.5 rounded-2xl bg-blue-950 hover:bg-blue-900 active:scale-95 text-xs font-bold text-white shadow-lg shadow-blue-950/15 transition-all cursor-pointer text-center"
-                  style={{ fontFamily: "'Poppins', sans-serif" }}
-                >
-                  {isEditing ? "Đang lưu..." : "Lưu thay đổi"}
-                </button>
-              </div>
-            </form>
+              </form>
+            </div>
           </div>
         </div>
-      </div>
       )}
 
       {/* POPUP 3: FORM XÁC NHẬN KHÓA / MỞ KHÓA TÀI KHOẢN WEB (Click Outside to Close) */}

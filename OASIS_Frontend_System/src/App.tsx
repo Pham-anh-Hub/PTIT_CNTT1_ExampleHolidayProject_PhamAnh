@@ -5,6 +5,7 @@ import { SAMPLE_TENANTS } from "./data";
 import { Tenant, User as UserType } from "./types";
 import Navbar from "./components/Navbar";
 import Sidebar from "./components/Sidebar";
+import SessionExpiredModal from "./components/SessionExpiredModal";
 import AppRoutes from "./router/AppRoutes";
 import { ROUTES, getDefaultRouteForRole } from "./router/routeConfig";
 import { AuthContext } from "./context/AuthContext";
@@ -26,7 +27,7 @@ export class StompClient {
   private subscriptions: Map<string, (msg: any) => void> = new Map();
   private reconnectTimer: any = null;
 
-  constructor(private url: string) {}
+  constructor(private url: string) { }
 
   connect(onConnect: () => void, onError: (err: any) => void) {
     if (this.reconnectTimer) clearTimeout(this.reconnectTimer);
@@ -363,45 +364,14 @@ export default function App() {
         )}
       </AnimatePresence>
 
-      {/* Modal phiên đăng nhập hết hạn */}
-      <AnimatePresence>
-        {showSessionExpired && (
-          <div className="fixed inset-0 z-[10000] flex items-center justify-center p-4 bg-slate-900/20 backdrop-blur-[2px]">
-            <motion.div
-              initial={{ opacity: 0, scale: 0.95, y: 20 }}
-              animate={{ opacity: 1, scale: 1, y: 0 }}
-              exit={{ opacity: 0, scale: 0.95, y: 20 }}
-              transition={{ type: "spring", stiffness: 300, damping: 25 }}
-              className="bg-white rounded-[24px] p-6 max-w-sm w-full shadow-2xl border border-slate-100 text-center relative overflow-hidden"
-            >
-              <div className="mx-auto w-12 h-12 bg-blue-50 rounded-full flex items-center justify-center mb-4 text-blue-950">
-                <svg className="w-6 h-6 animate-pulse" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.2"
-                    d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
-                </svg>
-              </div>
-              <h3 className="text-lg font-extrabold text-blue-950 mb-2">Phiên làm việc hết hạn</h3>
-              <p className="text-xs text-slate-500 mb-6 leading-relaxed font-medium">
-                Phiên làm việc của bạn đã hết hạn để đảm bảo an toàn bảo mật. Vui lòng đăng nhập lại.
-              </p>
-              <div className="flex space-x-3.5">
-                <button
-                  onClick={handleSessionConfirm}
-                  className="flex-1 py-2.5 bg-slate-50 hover:bg-slate-100 active:bg-slate-200 text-slate-600 font-bold rounded-xl text-xs transition duration-150 border border-slate-200"
-                >
-                  Bỏ qua
-                </button>
-                <button
-                  onClick={handleSessionConfirm}
-                  className="flex-1 py-2.5 bg-blue-950 hover:bg-blue-900 active:bg-blue-950 text-white font-bold rounded-xl text-xs transition duration-150 shadow-lg shadow-blue-950/20"
-                >
-                  Đăng nhập lại
-                </button>
-              </div>
-            </motion.div>
-          </div>
-        )}
-      </AnimatePresence>
+      {/* Component Modal Phiên làm việc hết hạn dùng chung cho mọi Role và Account */}
+      <SessionExpiredModal
+        isOpen={showSessionExpired}
+        onConfirm={handleSessionConfirm}
+        onClose={handleSessionConfirm}
+        userName={currentUser?.fullname}
+        userRole={currentUser?.role}
+      />
     </div>
   );
 }

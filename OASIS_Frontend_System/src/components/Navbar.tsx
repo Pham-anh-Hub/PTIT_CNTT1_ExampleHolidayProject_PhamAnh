@@ -105,7 +105,7 @@ export default function Navbar({
       <div className="flex items-center space-x-3 justify-self-start">
         <div className="flex items-center space-x-3 mr-1 shrink-0" id="oasis-logo-brand">
           <img 
-            src="/oasis_logo.png" 
+            src="/logo_system.png" 
             alt="OASIS Logo" 
             className="w-10 h-10 object-contain select-none shadow-xs"
           />
@@ -116,18 +116,8 @@ export default function Navbar({
         </div>
       </div>
 
-      {/* MIDDLE COL: Search Bar (Centered, only for Manager/Director) */}
+      {/* MIDDLE COL: Empty flex container */}
       <div className="flex justify-center items-center w-full">
-        {isManager && (
-          <div className="relative w-full max-w-sm hidden md:block" id="global-search-container">
-            <Search className="w-4 h-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
-            <input
-              type="text"
-              placeholder="Tìm nhanh nhân sự, đơn hàng, định mức..."
-              className="w-full bg-slate-50 border border-slate-200/60 rounded-xl pl-9 pr-4 py-2 text-xs text-slate-600 placeholder-slate-400 focus:outline-none focus:border-slate-teal focus:bg-white transition-all duration-200"
-            />
-          </div>
-        )}
       </div>
 
       {/* RIGHT COL: Action Center */}

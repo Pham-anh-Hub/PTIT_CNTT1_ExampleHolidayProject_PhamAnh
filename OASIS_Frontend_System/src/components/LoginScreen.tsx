@@ -147,9 +147,11 @@ export default function LoginScreen({ onLoginSuccess }: LoginScreenProps) {
 
         {/* Top: Branding logo and name pushed far to the top-left */}
         <div className="relative z-10 flex items-center space-x-3.5 self-start">
-          <div className="w-11 h-11 rounded-xl bg-slate-teal flex items-center justify-center text-white font-display font-black text-lg shadow-md border border-white/10">
-            O
-          </div>
+          <img
+            src="/logo_system.png"
+            alt="OASIS Logo"
+            className="w-11 h-11 rounded-xl object-contain shadow-md border border-white/10 select-none"
+          />
           <div className="text-left">
             <h1 className="text-xl font-black text-slate-800 tracking-tight font-display">OASIS</h1>
             <p className="text-[9px] text-slate-teal font-bold uppercase tracking-widest leading-none mt-0.5">Enterprise SaaS Platform</p>
@@ -187,9 +189,11 @@ export default function LoginScreen({ onLoginSuccess }: LoginScreenProps) {
       <div className="w-full lg:w-1/2 flex items-center justify-center p-6 sm:p-12 md:p-16 bg-white relative">
         {/* Mobile top branding */}
         <div className="absolute top-10 left-10 lg:hidden flex items-center space-x-2.5">
-          <div className="w-9 h-9 rounded-xl bg-slate-teal flex items-center justify-center text-white font-display font-black text-base shadow-md">
-            O
-          </div>
+          <img
+            src="/logo_system.png"
+            alt="OASIS Logo"
+            className="w-9 h-9 rounded-xl object-contain shadow-md select-none"
+          />
           <span className="font-display font-black text-base text-slate-800 tracking-tight">OASIS</span>
         </div>
 

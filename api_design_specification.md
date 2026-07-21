@@ -69,16 +69,23 @@ Dưới đây là danh sách các Endpoint và Dữ liệu trả về (phần `d
     }
     ```
 
-### 2.2. Chấm công hàng ngày (Dành cho Nhân viên - UC4)
-*   **Endpoint:** `POST /api/v1/hrm/attendance/check-in` (hoặc `check-out`)
-*   **Nhiệm vụ:** Ghi nhận giờ vào/ra ca.
-*   **Response Data:** 
+### 2.2. Ghi nhận Công Hàng Ngày Thủ Công cho Khối Sản xuất (WORK_LOG_PRODUCTION)
+*   **Endpoint 1 (Nhập công thủ công hàng ngày):** `POST /api/v1/work-logs/production/daily`
+*   **Endpoint 2 (Xem nhật ký công hàng ngày trong tháng - Dùng cho Redirect):** `GET /api/v1/work-logs/production/daily?employee_id={id}&period=YYYY-MM`
+*   **Nhiệm vụ:** **Khối Sản xuất (Quản lý Phân xưởng / SPM / Trưởng phòng Sản xuất)** chịu trách nhiệm trực tiếp nhập và xác nhận sản lượng công đoạn hàng ngày của công nhân. Ban Kế toán chỉ tiếp nhận kết quả tự động để kiểm tra bảng lương và giải ngân. cho phép xem lại nhật ký công từng ngày trong tháng khi bấm redirect từ Bảng Lương.
+*   **Response Data (Danh sách công hàng ngày):** 
     ```json
-    {
-      "work_date": "2026-07-10",
-      "check_in_time": "08:02:15",
-      "status": "Ghi nhận thành công"
-    }
+    [
+      {
+        "work_date": "2026-06-15",
+        "employee_name": "Trần Văn C",
+        "product_name": "Bàn gỗ Sồi",
+        "stage_name": "Công đoạn Cắt",
+        "completed_quantity": 25,
+        "unit_price": 30000,
+        "amount": 750000
+      }
+    ]
     ```
 
 ### 2.3. Quản lý Yêu cầu Nghỉ phép (UC5, UC6)
@@ -100,19 +107,70 @@ Dưới đây là danh sách các Endpoint và Dữ liệu trả về (phần `d
     ]
     ```
 
-### 2.4. Bảng tính lương (UC3)
-*   **Endpoint:** `GET /api/v1/hrm/payrolls?period=2026-06`
-*   **Nhiệm vụ:** Lấy danh sách lương tổng hợp tháng để HR xuất Excel.
+### 2.4. Bảng tính Lương Khối Văn Phòng (PAYROLL_OFFICE)
+*   **Endpoint 1 (Lấy bảng lương văn phòng):** `GET /api/v1/payroll/office?period=2026-06`
+*   **Endpoint 2 (Cập nhật note OT & Đi muộn):** `PUT /api/v1/payroll/office/{id}/adjustments`
+*   **Nhiệm vụ:** Quản lý lương nhân viên văn phòng dựa trên Lương cứng + Phụ cấp + Tiền OT - Phạt đi muộn/khấu trừ.
 *   **Response Data:**
     ```json
     [
       {
-        "employee_code": "...",
-        "fullname": "...",
-        "base_component": 15000000,
-        "production_component": 0,
-        "total_amount": 13500000,
-        "status": "finalized"
+        "stt": 1,
+        "employee_id": 10,
+        "employee_code": "CTY001-OFF-001",
+        "employee_name": "Nguyễn Văn A",
+        "department_name": "Kế toán",
+        "base_salary": 15000000,
+        "allowance": 1000000,
+        "ot_hours": 10.5,
+        "ot_amount": 1200000,
+        "late_count": 2,
+        "late_penalty_amount": 300000,
+        "late_note": "Đi muộn 2 lần (30 phút)",
+        "other_bonus": 1000000,
+        "net_salary": 17900000,
+        "status": "Chưa giải quyết" // "Chưa giải quyết" (PENDING) hoặc "Đã giải quyết" (PAID)
+      }
+    ]
+    ```
+
+### 2.5. Bảng tính Lương Khối Sản Xuất Phân Rã Theo Loại Hàng (PAYROLL_PRODUCTION)
+*   **Endpoint 1 (Lấy bảng lương sản xuất phân rã):** `GET /api/v1/payroll/production?period=2026-06`
+*   **Endpoint 2 (Cập nhật trạng thái giải quyết):** `PUT /api/v1/payroll/production/{id}/resolve`
+*   **Nhiệm vụ:** Quản lý lương công nhân sản xuất phân rã từng loại hàng/sản phẩm + số lượng + đơn giá + thành tiền và tổng kết.
+*   **Response Data:**
+    ```json
+    [
+      {
+        "stt": 1,
+        "employee_id": 25,
+        "employee_code": "CTY001-PROD-008",
+        "employee_name": "Trần Văn C",
+        "department_name": "Phân xưởng Mộc",
+        "items": [
+          {
+            "product_type": "Bàn gỗ Sồi (Công đoạn Cắt)",
+            "quantity": 150,
+            "unit_price": 30000,
+            "amount": 4500000
+          },
+          {
+            "product_type": "Ghế gỗ Sồi (Công đoạn Lắp ráp)",
+            "quantity": 80,
+            "unit_price": 50000,
+            "amount": 4000000
+          },
+          {
+            "product_type": "Tủ áo 3 cánh (Công đoạn Sơn PU)",
+            "quantity": 20,
+            "unit_price": 150000,
+            "amount": 3000000
+          }
+        ],
+        "total_quantity": 250,
+        "total_amount": 11500000,
+        "status": "Chưa giải quyết", // "Chưa giải quyết" (PENDING) hoặc "Đã giải quyết" (PAID)
+        "detail_redirect_url": "/work-logs/production/daily?employee_id=25&period=2026-06"
       }
     ]
     ```
@@ -186,16 +244,45 @@ Dưới đây là danh sách các Endpoint và Dữ liệu trả về (phần `d
 
 ---
 
-## 5. Nhóm Quản trị Hệ thống (Admin/Super Admin)
+## 6. Nhóm Kế toán (Accounting Module)
 
-### 5.1. Thiết lập Cấu hình Phê duyệt (Admin DN - UC14)
-*   **Endpoint:** `PUT /api/v1/sys/settings/approvals`
-*   **Nhiệm vụ:** Bật/tắt hoặc đổi hạn mức tiền (Ví dụ: Đổi ngưỡng duyệt đơn hàng từ 50tr xuống 20tr).
-*   **Response Data:**
-    ```json
-    {
-      "rule_type": "ORDER_AMOUNT_THRESHOLD",
-      "threshold_value": 20000000,
-      "is_enabled": true
-    }
-    ```
+### 6.1. Lập Phiếu Thu
+*   **Endpoint:** `POST /api/v1/accounting/receipts`
+*   **Nhiệm vụ:** Lập phiếu thu đợt cho đơn hàng hoặc thu hồi công nợ khách hàng.
+
+### 6.2. Lập Phiếu Chi
+*   **Endpoint:** `POST /api/v1/accounting/expenses`
+*   **Nhiệm vụ:** Lập phiếu chi cho chi trả lương, mua NVL, chi phí vận hành/dự án.
+
+### 6.3. Thống kê Dòng tiền (Thu/Chi)
+*   **Endpoint:** `GET /api/v1/accounting/receipts/cash-flow/summary?period=YYYY-MM`
+*   **Nhiệm vụ:** Tổng hợp tổng thu, tổng chi và dòng tiền ròng thực tế.
+
+### 6.4. Công nợ Khách hàng
+*   **Endpoint:** `GET /api/v1/accounting/debts/customers`
+*   **Nhiệm vụ:** Danh sách công nợ phải thu của khách hàng theo đợt đơn hàng.
+
+### 6.5. Lịch sử đợt thanh toán của đơn hàng
+*   **Endpoint:** `GET /api/v1/accounting/debts/orders/{orderId}/payment-schedule`
+*   **Nhiệm vụ:** Trả về các đợt đã thanh toán và số tiền còn nợ.
+
+### 6.6. Đối soát & Tổng hợp Bảng lương
+*   **Endpoint:** `POST /api/v1/accounting/payroll/aggregate?period=YYYY-MM`
+*   **Nhiệm vụ:** Tự động đối soát giờ công HR và sản lượng công đoạn Sản xuất để tính bảng lương.
+
+### 6.7. Giải ngân Lương
+*   **Endpoint:** `POST /api/v1/accounting/payroll/{payrollId}/disburse`
+*   **Nhiệm vụ:** Chốt duyệt và lập phiếu chi trả lương nhân viên.
+
+### 6.8. Ngân sách Dự án
+*   **Endpoint:** `GET /api/v1/accounting/projects/{projectId}/budget-status`
+*   **Nhiệm vụ:** Xem hạn mức ngân sách (`allocated_budget`) vs Chi phí thực tế (`actual_spent`).
+
+### 6.9. Lợi nhuận Gộp Dự án
+*   **Endpoint:** `GET /api/v1/accounting/projects/{projectId}/profitability`
+*   **Nhiệm vụ:** Thống kê Doanh thu thực thu - Chi phí thực tế và Tỷ suất lợi nhuận gộp.
+
+### 6.10. Báo cáo Thuế Thực tế
+*   **Endpoint:** `GET /api/v1/accounting/reports/tax/summary?period=YYYY-MM`
+*   **Nhiệm vụ:** Thống kê Thuế Gia công sản xuất, Thuế Thu nhập và Thuế GTGT (VAT).
+

@@ -2,7 +2,7 @@ import { useState, useEffect } from "react";
 import { useNavigate, useLocation } from "react-router-dom";
 import {
   LayoutDashboard, Users2, ShoppingCart, Hammer, Smartphone,
-  ChevronLeft, ChevronRight, HelpCircle, Calculator, Shield, Settings, Layers, Banknote, Sliders
+  ChevronLeft, ChevronRight, HelpCircle, Calculator, Shield, Settings, Layers, Banknote, Sliders, Receipt, CreditCard
 } from "lucide-react";
 import { Tenant, User as UserType } from "../types";
 import { getTenantDepartmentsApi } from "../api";
@@ -83,7 +83,12 @@ export default function Sidebar({ pendingApprovalsCount, currentTenant, currentU
       return [{ path: ROUTES.SALES_ORDERS, name: "Đơn Hàng & Công Nợ", shortName: "Kinh doanh", icon: ShoppingCart, badge: null, description: "Lập đơn hàng bán, kiểm duyệt ngưỡng thanh toán" }];
     }
     if (role === "ACCOUNTANT" || role === "ACCOUNTANT_STAFF" || role === "AD" || role.includes("KẾ TOÁN")) {
-      return [{ path: ROUTES.ACCOUNTANT_FINANCE, name: "Kế toán & Tiền lương", shortName: "Kế toán", icon: Calculator, badge: null, description: "Đối soát lương thợ, kiểm soát công nợ & doanh thu" }];
+      return [
+        { path: ROUTES.ACCOUNTANT_PRODUCTION_PAYROLL, name: "Lương Sản Xuất", shortName: "Lương SX", icon: Layers, badge: null, description: "Quản lý lương thợ sản phẩm & lương công ngày" },
+        { path: ROUTES.ACCOUNTANT_OFFICE_PAYROLL, name: "Lương Văn Phòng", shortName: "Lương VP", icon: Users2, badge: null, description: "Quản lý lương cố định, OT & phạt đi muộn" },
+        { path: ROUTES.ACCOUNTANT_VOUCHERS, name: "Thu - Chi & Dòng Tiền", shortName: "Thu Chi", icon: Receipt, badge: null, description: "Quản lý chứng từ phiếu thu cọc & phiếu chi" },
+        { path: ROUTES.ACCOUNTANT_DEBTS, name: "Công Nợ Đợt", shortName: "Công Nợ", icon: CreditCard, badge: null, description: "Đối soát thu nợ đơn hàng & nợ nhà cung cấp" },
+      ];
     }
     if (role === "PRODUCTION WORKER" || role === "WORKER" || role === "PRODUCTION_STAFF" || role.includes("SẢN XUẤT") || role.includes("CÔNG NHÂN")) {
       return [
